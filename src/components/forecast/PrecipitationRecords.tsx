@@ -8,7 +8,7 @@ import {
   YAxis,
   matchByDataKey,
 } from "recharts"
-import { useDailyForecast, type DailyEntry } from "../../hooks/useDailyForecast"
+import { useDailyForecast, type DailyEntry } from "../../hooks/useDailyWeather"
 import { usePlace } from "../../hooks/usePlace"
 
 type View = 'rain' | 'snow' | 'combined'

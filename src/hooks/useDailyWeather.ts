@@ -14,7 +14,7 @@ export type DailyEntry = {
   values: DailyValues
 }
 
-type ForecastResponse = {
+type DailyResponse = {
   timelines?: {
     daily?: DailyEntry[]
   }
@@ -53,7 +53,7 @@ function fetchDailyForecast(city: string) {
     )
     if (!res.ok) throw new Error(`Forecast request failed: ${res.status}`)
 
-    const data: ForecastResponse = await res.json()
+    const data: DailyResponse = await res.json()
     const entries = data.timelines?.daily ?? []
     if (entries.length === 0) throw new Error('Forecast response is missing daily data')
 

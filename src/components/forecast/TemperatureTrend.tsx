@@ -1,24 +1,32 @@
 import { useState } from "react"
 import TempGraph, { type TemperatureMetric, type TemperaturePoint } from "./TempGraph"
-import { useDailyForecast, type DailyEntry } from "../../hooks/useDailyForecast"
+import { useHourlyHistory, type HourlyEntry } from "../../hooks/useHourlyHistory"
 import { usePlace } from "../../hooks/usePlace"
 
 const METRICS: { key: TemperatureMetric; label: string }[] = [
-  { key: 'max', label: 'High' },
-  { key: 'avg', label: 'Average' },
-  { key: 'min', label: 'Low' },
+  { key: 'temperature', label: 'Temperature' },
+  { key: 'apparent', label: 'Feels like' },
 ]
 
 const METRIC_KEYS = {
-  max: 'temperatureMax',
-  avg: 'temperatureAvg',
-  min: 'temperatureMin',
+  temperature: 'temperature',
+  apparent: 'temperatureApparent',
 } as const
 
 function formatDay(iso: string, options: Intl.DateTimeFormatOptions) {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return '—'
-  return date.toLocaleDateString(undefined, { ...options, timeZone: 'UTC' })
+  return date.toLocaleDateString(undefined, options)
+}
+
+function formatTime(iso: string) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+}
+
+function formatHour(iso: string) {
+  return `${formatDay(iso, { weekday: 'short' })} ${formatTime(iso)}`
 }
 
 function roundTemperature(value?: number) {
@@ -27,85 +35,82 @@ function roundTemperature(value?: number) {
 
 function TemperatureTrend() {
   const { place: currentPlace, error: placeError } = usePlace()
-  const [metric, setMetric] = useState<TemperatureMetric>('max')
+  const [metric, setMetric] = useState<TemperatureMetric>('temperature')
 
   const city = currentPlace?.city ?? currentPlace?.locality ?? ''
-  const { daily, error: forecastError } = useDailyForecast(city)
+  const { hourly, error: historyError } = useHourlyHistory(city)
 
-  const entries = daily ?? []
+  const entries = hourly ?? []
 
   const points: TemperaturePoint[] = entries.flatMap((entry) => {
-    const max = roundTemperature(entry.values.temperatureMax)
-    const avg = roundTemperature(entry.values.temperatureAvg)
-    const min = roundTemperature(entry.values.temperatureMin)
+    const temperature = roundTemperature(entry.values.temperature)
+    const apparent = roundTemperature(entry.values.temperatureApparent)
 
-    if (max === null || avg === null || min === null) return []
+    if (temperature === null || apparent === null) return []
 
     return [
       {
-        label: formatDay(entry.time, { weekday: 'short', day: 'numeric' }),
-        max,
-        avg,
-        min,
+        label: formatTime(entry.time),
+        temperature,
+        apparent,
       },
     ]
   })
 
-  const warmest = entries.reduce<DailyEntry | null>((best, entry) => {
-    const value = entry.values.temperatureMax
+  const warmest = entries.reduce<HourlyEntry | null>((best, entry) => {
+    const value = entry.values.temperature
     if (value === undefined) return best
-    if (!best || (best.values.temperatureMax ?? -Infinity) < value) return entry
+    if (!best || (best.values.temperature ?? -Infinity) < value) return entry
     return best
   }, null)
 
-  const coolest = entries.reduce<DailyEntry | null>((best, entry) => {
-    const value = entry.values.temperatureMin
+  const coolest = entries.reduce<HourlyEntry | null>((best, entry) => {
+    const value = entry.values.temperature
     if (value === undefined) return best
-    if (!best || (best.values.temperatureMin ?? Infinity) > value) return entry
+    if (!best || (best.values.temperature ?? Infinity) > value) return entry
     return best
   }, null)
 
-  const focusEntry = entries.reduce<DailyEntry | null>((best, entry) => {
+  const focusEntry = entries.reduce<HourlyEntry | null>((best, entry) => {
     const key = METRIC_KEYS[metric]
     const value = entry.values[key]
     if (value === undefined) return best
     if (!best) return entry
     const bestValue = best.values[key]
     if (bestValue === undefined) return entry
-    const isBetter = metric === 'min' ? value < bestValue : value > bestValue
-    return isBetter ? entry : best
+    return value > bestValue ? entry : best
   }, null)
 
-  const avgValues = entries
-    .map((entry) => entry.values.temperatureAvg)
+  const temperatureValues = entries
+    .map((entry) => entry.values.temperature)
     .filter((value): value is number => value !== undefined && Number.isFinite(value))
-  const weeklyAverage = avgValues.length
-    ? avgValues.reduce((sum, value) => sum + value, 0) / avgValues.length
+  const averageTemperature = temperatureValues.length
+    ? temperatureValues.reduce((sum, value) => sum + value, 0) / temperatureValues.length
     : null
 
   const summary = [
     {
       icon: 'equalizer',
-      label: 'Weekly Average',
-      value: weeklyAverage === null ? '—' : `${weeklyAverage.toFixed(1)}°C`,
+      label: '24h Average',
+      value: averageTemperature === null ? '—' : `${averageTemperature.toFixed(1)}°C`,
       tone: 'primary',
     },
     {
       icon: 'wb_sunny',
-      label: 'Warmest Day',
+      label: 'Warmest Reading',
       value:
         warmest === null
           ? '—'
-          : `${formatDay(warmest.time, { weekday: 'long' })} (${roundTemperature(warmest.values.temperatureMax)}°C)`,
+          : `${formatHour(warmest.time)} (${roundTemperature(warmest.values.temperature)}°C)`,
       tone: 'secondary',
     },
     {
       icon: 'mode_night',
-      label: 'Coolest Night',
+      label: 'Coolest Reading',
       value:
         coolest === null
           ? '—'
-          : `${formatDay(coolest.time, { weekday: 'long' })} (${roundTemperature(coolest.values.temperatureMin)}°C)`,
+          : `${formatHour(coolest.time)} (${roundTemperature(coolest.values.temperature)}°C)`,
       tone: 'primary',
     },
   ]
@@ -117,10 +122,10 @@ function TemperatureTrend() {
       : Math.min(90, Math.max(10, 10 + (focusIndex / (entries.length - 1)) * 80))
 
   const statusMessage = placeError
-    ? 'Location unavailable — cannot load the forecast.'
-    : forecastError
-      ? 'Forecast unavailable right now.'
-      : 'Loading forecast…'
+    ? 'Location unavailable — cannot load the history.'
+    : historyError
+      ? 'Temperature history unavailable right now.'
+      : 'Loading temperature history…'
 
   return (
     <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg lg:p-space-xl shadow-sm">
@@ -129,11 +134,11 @@ function TemperatureTrend() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[22px]">show_chart</span>
             <h2 className="font-headline-md text-headline-md text-on-surface font-semibold">
-              7-Day Temperature Forecast
+              Past 24 Hours Temperature History
             </h2>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Daily high, low, and average temperatures
+            Hourly observed temperature and feels-like readings
             {city ? ` for ${city}` : ''}
           </p>
         </div>
@@ -169,25 +174,20 @@ function TemperatureTrend() {
                     weekday: 'long',
                     month: 'short',
                     day: 'numeric',
-                  })}
+                  })}{' '}
+                  · {formatTime(focusEntry.time)}
                 </div>
                 <div className="flex items-center gap-3 font-label-md text-label-md">
                   <span>
-                    Max:{' '}
+                    Temp:{' '}
                     <strong className="text-on-surface">
-                      {roundTemperature(focusEntry.values.temperatureMax)}°C
+                      {roundTemperature(focusEntry.values.temperature)}°C
                     </strong>
                   </span>
                   <span>
-                    Min:{' '}
-                    <strong className="text-on-surface">
-                      {roundTemperature(focusEntry.values.temperatureMin)}°C
-                    </strong>
-                  </span>
-                  <span>
-                    Avg:{' '}
+                    Feels:{' '}
                     <strong className="text-primary font-semibold">
-                      {roundTemperature(focusEntry.values.temperatureAvg)}°C
+                      {roundTemperature(focusEntry.values.temperatureApparent)}°C
                     </strong>
                   </span>
                 </div>

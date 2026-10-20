@@ -9,17 +9,15 @@ import {
 
 export type TemperaturePoint = {
   label: string;
-  max: number;
-  avg: number;
-  min: number;
+  temperature: number;
+  apparent: number;
 };
 
-export type TemperatureMetric = "max" | "avg" | "min";
+export type TemperatureMetric = "temperature" | "apparent";
 
 const SERIES: Record<TemperatureMetric, { name: string; color: string }> = {
-  max: { name: "Daily High", color: "#006194" },
-  avg: { name: "Daily Average", color: "#40c2fd" },
-  min: { name: "Daily Low", color: "#707881" },
+  temperature: { name: "Temperature", color: "#006194" },
+  apparent: { name: "Feels like", color: "#40c2fd" },
 };
 
 const Typed = createHorizontalChart<TemperaturePoint, string, number>()({
@@ -59,6 +57,7 @@ const TempGraph = ({ data, metric }: TempGraphProps) => {
         dataKey="label"
         tickLine={false}
         axisLine={false}
+        minTickGap={24}
         tick={{ fontSize: 11, fill: "#707881" }}
       />
       <Typed.YAxis
