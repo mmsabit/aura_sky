@@ -69,7 +69,7 @@ function PrecipitationRecords() {
       </div>
 
       <div className="relative w-full overflow-x-auto pt-space-xs">
-        <div className="min-w-[680px]">
+        <div className="min-w-170">
           <svg
             className="w-full h-64 overflow-visible"
             fill="none"

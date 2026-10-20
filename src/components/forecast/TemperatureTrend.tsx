@@ -1,12 +1,185 @@
-const ranges = ['Last 7 Days', 'Last 14 Days', 'Last 30 Days']
+import { useEffect, useState } from "react"
+import TempGraph, { type TemperatureMetric, type TemperaturePoint } from "./TempGraph"
+import { usePlace } from "../../hooks/usePlace"
 
-const summary = [
-  { icon: 'equalizer', label: 'Weekly Average', value: '19.7°C', tone: 'primary' },
-  { icon: 'wb_sunny', label: 'Warmest Day', value: 'Wednesday (24°C)', tone: 'secondary' },
-  { icon: 'mode_night', label: 'Coolest Night', value: 'Saturday (10°C)', tone: 'primary' },
+type DailyValues = {
+  temperatureMax?: number
+  temperatureMin?: number
+  temperatureAvg?: number
+}
+
+type DailyEntry = {
+  time: string
+  values: DailyValues
+}
+
+type ForecastResponse = {
+  timelines?: {
+    daily?: DailyEntry[]
+  }
+}
+
+const METRICS: { key: TemperatureMetric; label: string }[] = [
+  { key: 'max', label: 'High' },
+  { key: 'avg', label: 'Average' },
+  { key: 'min', label: 'Low' },
 ]
 
+const METRIC_KEYS = {
+  max: 'temperatureMax',
+  avg: 'temperatureAvg',
+  min: 'temperatureMin',
+} as const
+
+function formatDay(iso: string, options: Intl.DateTimeFormatOptions) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString(undefined, { ...options, timeZone: 'UTC' })
+}
+
+function roundTemperature(value?: number) {
+  return value === undefined || !Number.isFinite(value) ? null : Math.round(value)
+}
+
 function TemperatureTrend() {
+  const { place: currentPlace, error: placeError } = usePlace()
+  const [daily, setDaily] = useState<DailyEntry[] | null>(null)
+  const [forecastError, setForecastError] = useState(false)
+  const [metric, setMetric] = useState<TemperatureMetric>('max')
+
+  const city = currentPlace?.city ?? currentPlace?.locality ?? ''
+
+  useEffect(() => {
+    if (!city) return
+
+    const controller = new AbortController()
+
+    const getForecast = async () => {
+      try {
+        const apiKey = import.meta.env.VITE_WEATHER_API
+        if (!apiKey) throw new Error('Missing VITE_WEATHER_API environment variable')
+
+        const params = new URLSearchParams({
+          location: city,
+          timesteps: '1d',
+          apikey: apiKey,
+          units: 'metric',
+        })
+        const res = await fetch(
+          `https://api.tomorrow.io/v4/weather/forecast?${params.toString()}`,
+          { signal: controller.signal },
+        )
+        if (!res.ok) throw new Error(`Forecast request failed: ${res.status}`)
+
+        const data: ForecastResponse = await res.json()
+        const entries = data.timelines?.daily ?? []
+        if (entries.length === 0) throw new Error('Forecast response is missing daily data')
+
+        setDaily(entries)
+        setForecastError(false)
+      } catch (error) {
+        if (controller.signal.aborted) return
+        console.error(error)
+        setDaily(null)
+        setForecastError(true)
+      }
+    }
+
+    getForecast()
+
+    return () => controller.abort()
+  }, [city])
+
+  const entries = daily ?? []
+
+  const points: TemperaturePoint[] = entries.flatMap((entry) => {
+    const max = roundTemperature(entry.values.temperatureMax)
+    const avg = roundTemperature(entry.values.temperatureAvg)
+    const min = roundTemperature(entry.values.temperatureMin)
+
+    if (max === null || avg === null || min === null) return []
+
+    return [
+      {
+        label: formatDay(entry.time, { weekday: 'short', day: 'numeric' }),
+        max,
+        avg,
+        min,
+      },
+    ]
+  })
+
+  const warmest = entries.reduce<DailyEntry | null>((best, entry) => {
+    const value = entry.values.temperatureMax
+    if (value === undefined) return best
+    if (!best || (best.values.temperatureMax ?? -Infinity) < value) return entry
+    return best
+  }, null)
+
+  const coolest = entries.reduce<DailyEntry | null>((best, entry) => {
+    const value = entry.values.temperatureMin
+    if (value === undefined) return best
+    if (!best || (best.values.temperatureMin ?? Infinity) > value) return entry
+    return best
+  }, null)
+
+  const focusEntry = entries.reduce<DailyEntry | null>((best, entry) => {
+    const key = METRIC_KEYS[metric]
+    const value = entry.values[key]
+    if (value === undefined) return best
+    if (!best) return entry
+    const bestValue = best.values[key]
+    if (bestValue === undefined) return entry
+    const isBetter = metric === 'min' ? value < bestValue : value > bestValue
+    return isBetter ? entry : best
+  }, null)
+
+  const avgValues = entries
+    .map((entry) => entry.values.temperatureAvg)
+    .filter((value): value is number => value !== undefined && Number.isFinite(value))
+  const weeklyAverage = avgValues.length
+    ? avgValues.reduce((sum, value) => sum + value, 0) / avgValues.length
+    : null
+
+  const summary = [
+    {
+      icon: 'equalizer',
+      label: 'Weekly Average',
+      value: weeklyAverage === null ? '—' : `${weeklyAverage.toFixed(1)}°C`,
+      tone: 'primary',
+    },
+    {
+      icon: 'wb_sunny',
+      label: 'Warmest Day',
+      value:
+        warmest === null
+          ? '—'
+          : `${formatDay(warmest.time, { weekday: 'long' })} (${roundTemperature(warmest.values.temperatureMax)}°C)`,
+      tone: 'secondary',
+    },
+    {
+      icon: 'mode_night',
+      label: 'Coolest Night',
+      value:
+        coolest === null
+          ? '—'
+          : `${formatDay(coolest.time, { weekday: 'long' })} (${roundTemperature(coolest.values.temperatureMin)}°C)`,
+      tone: 'primary',
+    },
+  ]
+
+  const focusIndex = focusEntry === null ? -1 : entries.indexOf(focusEntry)
+  const calloutLeft =
+    focusIndex < 0 || entries.length < 2
+      ? 50
+      : Math.min(90, Math.max(10, 10 + (focusIndex / (entries.length - 1)) * 80))
+
+  const statusMessage = placeError
+    ? 'Location unavailable — cannot load the forecast.'
+    : forecastError
+      ? 'Forecast unavailable right now.'
+      : 'Loading forecast…'
+
   return (
     <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg lg:p-space-xl shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md pb-space-xs">
@@ -14,176 +187,80 @@ function TemperatureTrend() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary text-[22px]">show_chart</span>
             <h2 className="font-headline-md text-headline-md text-on-surface font-semibold">
-              Past 7 Days Temperature History
+              7-Day Temperature Forecast
             </h2>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Observed daily high, low, and average thermal variance with diurnal amplitude
+            Daily high, low, and average temperatures
+            {city ? ` for ${city}` : ''}
           </p>
         </div>
         <div className="inline-flex p-1 rounded-xl bg-surface-container-low self-start sm:self-auto">
-          {ranges.map((range, index) => (
+          {METRICS.map((option) => (
             <button
-              key={range}
+              key={option.key}
               className={
-                index === 0
+                option.key === metric
                   ? 'px-3 py-1.5 rounded-lg bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md font-semibold'
                   : 'px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors'
               }
+              onClick={() => setMetric(option.key)}
               type="button"
             >
-              {range}
+              {option.label}
             </button>
           ))}
         </div>
       </div>
 
       <div className="relative w-full overflow-x-auto pt-space-md">
-        <div className="min-w-[700px] relative">
-          <div className="absolute left-[78%] -top-3 -translate-x-1/2 z-20 pointer-events-none transition-transform">
-            <div className="flex flex-col gap-1 px-3.5 py-2.5 rounded-xl bg-surface-container-lowest shadow-xl text-on-surface font-body-sm text-body-sm">
-              <div className="flex items-center gap-1.5 text-secondary font-label-sm text-label-sm font-semibold">
-                <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
-                Saturday, Oct 18
+        <div className="min-w-175 relative">
+          {focusEntry !== null ? (
+            <div
+              className="absolute -top-3 -translate-x-1/2 z-20 pointer-events-none transition-transform"
+              style={{ left: `${calloutLeft}%` }}
+            >
+              <div className="flex flex-col gap-1 px-3.5 py-2.5 rounded-xl bg-surface-container-lowest shadow-xl text-on-surface font-body-sm text-body-sm">
+                <div className="flex items-center gap-1.5 text-secondary font-label-sm text-label-sm font-semibold">
+                  <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
+                  {formatDay(focusEntry.time, {
+                    weekday: 'long',
+                    month: 'short',
+                    day: 'numeric',
+                  })}
+                </div>
+                <div className="flex items-center gap-3 font-label-md text-label-md">
+                  <span>
+                    Max:{' '}
+                    <strong className="text-on-surface">
+                      {roundTemperature(focusEntry.values.temperatureMax)}°C
+                    </strong>
+                  </span>
+                  <span>
+                    Min:{' '}
+                    <strong className="text-on-surface">
+                      {roundTemperature(focusEntry.values.temperatureMin)}°C
+                    </strong>
+                  </span>
+                  <span>
+                    Avg:{' '}
+                    <strong className="text-primary font-semibold">
+                      {roundTemperature(focusEntry.values.temperatureAvg)}°C
+                    </strong>
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center gap-3 font-label-md text-label-md">
-                <span>
-                  Max: <strong className="text-on-surface">21°C</strong>
-                </span>
-                <span>
-                  Min: <strong className="text-on-surface">12°C</strong>
-                </span>
-                <span>
-                  Avg: <strong className="text-primary font-semibold">16.5°C</strong>
-                </span>
-              </div>
+              <div className="w-2.5 h-2.5 bg-surface-container-lowest rotate-45 mx-auto -mt-1 shadow-sm"></div>
             </div>
-            <div className="w-2.5 h-2.5 bg-surface-container-lowest rotate-45 mx-auto -mt-1 shadow-sm"></div>
-          </div>
+          ) : null}
 
-          <svg
-            className="w-full h-72 overflow-visible"
-            fill="none"
-            viewBox="0 0 840 260"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <defs>
-              <linearGradient gradientUnits="userSpaceOnUse" id="skyTempGrad" x1="0" x2="0" y1="0" y2="240">
-                <stop offset="0%" stopColor="#38BDF8" stopOpacity="0.32"></stop>
-                <stop offset="60%" stopColor="#BAE6FD" stopOpacity="0.1"></stop>
-                <stop offset="100%" stopColor="#FFFFFF" stopOpacity="0.0"></stop>
-              </linearGradient>
-            </defs>
-
-            <line stroke="#E2E8F0" strokeDasharray="4 4" strokeWidth="1" x1="40" x2="800" y1="30" y2="30"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="11" textAnchor="end" x="25" y="34">
-              26°C
-            </text>
-            <line stroke="#E2E8F0" strokeDasharray="4 4" strokeWidth="1" x1="40" x2="800" y1="80" y2="80"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="11" textAnchor="end" x="25" y="84">
-              22°C
-            </text>
-            <line stroke="#E2E8F0" strokeDasharray="4 4" strokeWidth="1" x1="40" x2="800" y1="130" y2="130"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="11" textAnchor="end" x="25" y="134">
-              18°C
-            </text>
-            <line stroke="#E2E8F0" strokeDasharray="4 4" strokeWidth="1" x1="40" x2="800" y1="180" y2="180"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="11" textAnchor="end" x="25" y="184">
-              14°C
-            </text>
-            <line stroke="#E2E8F0" strokeWidth="1" x1="40" x2="800" y1="230" y2="230"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="11" textAnchor="end" x="25" y="234">
-              10°C
-            </text>
-
-            <line stroke="#F1F5F9" strokeWidth="1" x1="80" x2="80" y1="30" y2="230"></line>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="200" x2="200" y1="30" y2="230"></line>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="320" x2="320" y1="30" y2="230"></line>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="440" x2="440" y1="30" y2="230"></line>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="560" x2="560" y1="30" y2="230"></line>
-            <line stroke="#BAE6FD" strokeDasharray="3 3" strokeWidth="1.5" x1="680" x2="680" y1="30" y2="230"></line>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="780" x2="780" y1="30" y2="230"></line>
-
-            <path
-              d="M 80,118 C 140,95 160,80 200,80 C 260,80 280,55 320,55 C 380,55 400,105 440,105 C 500,105 520,130 560,130 C 620,130 640,142 680,142 C 730,142 750,130 780,130 L 780,230 L 80,230 Z"
-              fill="url(#skyTempGrad)"
-            ></path>
-            <path
-              d="M 80,118 C 140,95 160,80 200,80 C 260,80 280,55 320,55 C 380,55 400,105 440,105 C 500,105 520,130 560,130 C 620,130 640,142 680,142 C 730,142 750,130 780,130"
-              fill="none"
-              stroke="#0284C7"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="3"
-            ></path>
-            <path
-              d="M 80,205 C 140,192 160,192 200,192 C 260,192 280,168 320,168 C 380,168 400,180 440,180 C 500,180 520,218 560,218 C 620,218 640,230 680,230 C 730,230 750,192 780,192"
-              fill="none"
-              stroke="#38BDF8"
-              strokeDasharray="5 5"
-              strokeLinecap="round"
-              strokeWidth="2"
-            ></path>
-
-            <circle cx="80" cy="118" fill="#FFFFFF" r="4.5" stroke="#0284C7" strokeWidth="2.5"></circle>
-            <text fill="#0F172A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="80" y="106">
-              19°
-            </text>
-            <circle cx="200" cy="80" fill="#FFFFFF" r="4.5" stroke="#0284C7" strokeWidth="2.5"></circle>
-            <text fill="#0F172A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="200" y="68">
-              22°
-            </text>
-            <circle cx="320" cy="55" fill="#0284C7" r="5.5" stroke="#FFFFFF" strokeWidth="2"></circle>
-            <text fill="#0284C7" fontFamily="Plus Jakarta Sans" fontSize="12" fontWeight="700" textAnchor="middle" x="320" y="43">
-              24°C
-            </text>
-            <circle cx="440" cy="105" fill="#FFFFFF" r="4.5" stroke="#0284C7" strokeWidth="2.5"></circle>
-            <text fill="#0F172A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="440" y="93">
-              20°
-            </text>
-            <circle cx="560" cy="130" fill="#FFFFFF" r="4.5" stroke="#0284C7" strokeWidth="2.5"></circle>
-            <text fill="#0F172A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="560" y="118">
-              18°
-            </text>
-            <circle cx="680" cy="142" fill="#38BDF8" r="6" stroke="#FFFFFF" strokeWidth="2.5"></circle>
-            <text fill="#0284C7" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="700" textAnchor="middle" x="680" y="130">
-              17°
-            </text>
-            <circle cx="780" cy="130" fill="#FFFFFF" r="4.5" stroke="#0284C7" strokeWidth="2.5"></circle>
-            <text fill="#0F172A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="780" y="118">
-              18°
-            </text>
-
-            <circle cx="80" cy="205" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="200" cy="192" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="320" cy="168" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="440" cy="180" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="560" cy="218" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="680" cy="230" fill="#00668A" r="4.5" stroke="#FFFFFF" strokeWidth="2"></circle>
-            <circle cx="780" cy="192" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-
-            <text fill="#64748B" fontFamily="Inter" fontSize="12" fontWeight="500" textAnchor="middle" x="80" y="252">
-              Mon 13
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="12" fontWeight="500" textAnchor="middle" x="200" y="252">
-              Tue 14
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="12" fontWeight="500" textAnchor="middle" x="320" y="252">
-              Wed 15
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="12" fontWeight="500" textAnchor="middle" x="440" y="252">
-              Thu 16
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="12" fontWeight="500" textAnchor="middle" x="560" y="252">
-              Fri 17
-            </text>
-            <text fill="#0284C7" fontFamily="Inter" fontSize="12" fontWeight="700" textAnchor="middle" x="680" y="252">
-              Sat 18
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="12" fontWeight="500" textAnchor="middle" x="780" y="252">
-              Sun 19
-            </text>
-          </svg>
+          {points.length > 0 ? (
+            <TempGraph data={points} metric={metric} />
+          ) : (
+            <div className="flex h-64 items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
+              {statusMessage}
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,4 +1,5 @@
-import { useGeolocated } from "react-geolocated";
+import { useEffect, useState } from "react";
+import { usePlace } from "../../hooks/usePlace";
 
 type Metric = {
   label: string
@@ -9,22 +10,219 @@ type Metric = {
   headline?: boolean
 }
 
-const metrics: Metric[] = [
-  { label: 'Humidity', icon: 'humidity_percentage', value: '68%', progress: 68 },
-  { label: 'Air Flow', icon: 'air', value: '14', unit: 'km/h NW' },
-  { label: 'Precipitation', icon: 'water_drop', value: '0.0', unit: 'mm', progress: 2 },
-  { label: 'Rain Chance', icon: 'umbrella', value: '15%' },
-  { label: 'Snowfall Prob.', icon: 'ac_unit', value: '0%' },
-  {
-    label: 'UV & Air Quality',
-    icon: 'nest_eco_leaf',
-    value: 'UV 4 • AQI 28',
-    headline: true,
-  },
+type WeatherValues = {
+  temperature?: number
+  temperatureApparent?: number
+  humidity?: number
+  precipitationProbability?: number
+  rainIntensity?: number
+  sleetIntensity?: number
+  snowIntensity?: number
+  pressureSeaLevel?: number
+  windSpeed?: number
+  windDirection?: number
+  uvIndex?: number
+  weatherCode?: number
+}
+
+type RealtimeResponse = {
+  data?: {
+    time?: string
+    values?: WeatherValues
+  }
+}
+
+const WEATHER_CODES: Record<number, string> = {
+  1000: 'Clear',
+  1001: 'Cloudy',
+  1100: 'Mostly Clear',
+  1101: 'Partly Cloudy',
+  1102: 'Mostly Cloudy',
+  2000: 'Fog',
+  2100: 'Light Fog',
+  3000: 'Light Wind',
+  3001: 'Windy',
+  3002: 'Strong Wind',
+  4000: 'Drizzle',
+  4001: 'Rain',
+  4200: 'Light Rain',
+  4201: 'Heavy Rain',
+  5000: 'Snow',
+  5001: 'Flurries',
+  5100: 'Light Snow',
+  5101: 'Heavy Snow',
+  6000: 'Freezing Drizzle',
+  6001: 'Freezing Rain',
+  6200: 'Light Freezing Rain',
+  6201: 'Heavy Freezing Rain',
+  7000: 'Ice Pellets',
+  7101: 'Heavy Ice Pellets',
+  7102: 'Light Ice Pellets',
+  8000: 'Thunderstorm',
+}
+
+const COMPASS_POINTS = [
+  'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW',
 ]
 
+function conditionLabel(code?: number) {
+  if (code === undefined) return 'Conditions unavailable'
+  return WEATHER_CODES[code] ?? 'Unknown conditions'
+}
+
+function windDirectionLabel(degrees?: number) {
+  if (degrees === undefined || !Number.isFinite(degrees)) return ''
+  return COMPASS_POINTS[Math.round(degrees / 22.5) % 16]
+}
+
+function uvSeverity(uv?: number) {
+  if (uv === undefined || !Number.isFinite(uv)) return ''
+  if (uv < 3) return 'Low'
+  if (uv < 6) return 'Moderate'
+  if (uv < 8) return 'High'
+  if (uv < 11) return 'Very High'
+  return 'Extreme'
+}
+
+function formatMetric(value: number | undefined, digits = 0) {
+  return value === undefined || !Number.isFinite(value) ? '—' : value.toFixed(digits)
+}
+
+function formatTemperature(value?: number) {
+  return value === undefined || !Number.isFinite(value) ? '—' : `${Math.round(value)}°C`
+}
+
+function formatUpdatedAt(iso?: string) {
+  if (!iso) return 'Awaiting telemetry'
+
+  const observed = new Date(iso)
+  if (Number.isNaN(observed.getTime())) return 'Awaiting telemetry'
+
+  const minutes = Math.max(0, Math.round((Date.now() - observed.getTime()) / 60000))
+  const ago = minutes < 1 ? 'just now' : `${minutes} min${minutes === 1 ? '' : 's'} ago`
+  const date = observed.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'short',
+    day: 'numeric',
+  })
+
+  return `Updated ${ago} • ${date}`
+}
+
 function CurrentConditions() {
-  const {coords} = useGeolocated({});
+  const { coords, place: location, error: locationError } = usePlace();
+  const [weather, setWeather] = useState<WeatherValues | null>(null);
+  const [observedAt, setObservedAt] = useState<string>();
+  const [weatherError, setWeatherError] = useState(false);
+
+  const place = location?.city ?? location?.locality ?? '';
+
+  useEffect(() => {
+    if (!place) return;
+
+    const controller = new AbortController();
+
+    const getWeather = async () => {
+      try {
+        const apiKey = import.meta.env.VITE_WEATHER_API;
+        if (!apiKey) throw new Error('Missing VITE_WEATHER_API environment variable');
+
+        const params = new URLSearchParams({
+          location: place,
+          apikey: apiKey,
+          units: 'metric',
+        });
+        const res = await fetch(
+          `https://api.tomorrow.io/v4/weather/realtime?${params.toString()}`,
+          { signal: controller.signal },
+        );
+        if (!res.ok) throw new Error(`Weather request failed: ${res.status}`);
+
+        const data: RealtimeResponse = await res.json();
+        if (!data.data?.values) throw new Error('Weather response is missing values');
+
+        setWeather(data.data.values);
+        setObservedAt(data.data.time);
+        setWeatherError(false);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        console.error(error);
+        setWeather(null);
+        setObservedAt(undefined);
+        setWeatherError(true);
+      }
+    };
+
+    getWeather();
+
+    return () => controller.abort();
+  }, [place]);
+
+  const values = weather ?? {};
+  const precipitationIntensity =
+    (values.rainIntensity ?? 0) + (values.sleetIntensity ?? 0) + (values.snowIntensity ?? 0);
+  const windSpeedKmh =
+    values.windSpeed === undefined ? undefined : values.windSpeed * 3.6;
+  const windDirection = windDirectionLabel(values.windDirection);
+  const uvValue =
+    values.uvIndex === undefined
+      ? 'UV —'
+      : `UV ${Math.round(values.uvIndex)} • ${uvSeverity(values.uvIndex)}`;
+
+  const metrics: Metric[] = [
+    {
+      label: 'Humidity',
+      icon: 'humidity_percentage',
+      value: `${formatMetric(values.humidity)}%`,
+
+    },
+    {
+      label: 'Air Flow',
+      icon: 'air',
+      value: formatMetric(windSpeedKmh),
+      unit: ['km/h', windDirection].filter(Boolean).join(' '),
+    },
+    {
+      label: 'Precipitation',
+      icon: 'water_drop',
+      value: formatMetric(precipitationIntensity, 1),
+      unit: 'mm/h',
+    },
+    {
+      label: 'Rain Chance',
+      icon: 'umbrella',
+      value: `${formatMetric(values.precipitationProbability)}%`,
+    },
+    {
+      label: 'Pressure',
+      icon: 'speed',
+      value: formatMetric(values.pressureSeaLevel),
+      unit: 'hPa',
+    },
+    {
+      label: 'UV Index',
+      icon: 'nest_eco_leaf',
+      value: uvValue,
+      headline: true,
+    },
+  ];
+
+  const placeLabel = location
+    ? [place, location.principalSubdivision].filter(Boolean).join(', ')
+    : '';
+  const displayPlace = placeLabel || (locationError ? 'Location unavailable' : 'Locating…');
+  const conditionText = weatherError
+    ? 'Weather unavailable'
+    : weather
+      ? conditionLabel(values.weatherCode)
+      : 'Fetching conditions…';
+  const temperature = values.temperature === undefined ? '—' : Math.round(values.temperature);
+  const windSummary =
+    windSpeedKmh === undefined
+      ? 'Wind unavailable'
+      : `${Math.round(windSpeedKmh)} km/h ${windDirection}`.trim();
+
   return (
     <section className="flex flex-col gap-space-lg">
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-space-md">
@@ -32,49 +230,33 @@ function CurrentConditions() {
           <div className="flex flex-wrap items-center gap-space-xs">
             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-surface-container-low text-secondary font-label-md text-label-md">
               <span className="w-1.5 h-1.5 rounded-full bg-secondary-container animate-pulse"></span>
-              Updated 2 mins ago • Sunday, Oct 19
+              {formatUpdatedAt(observedAt)}
             </span>
             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-surface-container-lowest shadow-sm text-outline font-label-md text-label-md">
               <span className="material-symbols-outlined text-[14px] text-secondary">explore</span>
-              {coords?.latitude}° N, {coords?.longitude}° W
+              {coords
+                ? `${coords.latitude.toFixed(6)}°, ${coords.longitude.toFixed(6)}°`
+                : 'Waiting for GPS'}
             </span>
           </div>
           <div className="flex items-baseline gap-space-sm pt-space-2xs">
             <h1 className="font-headline-xl text-headline-xl text-on-surface tracking-tight">
-              San Francisco, California
+              {displayPlace}
             </h1>
           </div>
-        </div>
-        <div className="flex items-center gap-space-sm">
-          <button
-            className="group inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md text-primary font-headline-sm text-headline-sm transition-all duration-200"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[18px] text-secondary group-hover:rotate-45 transition-transform duration-300">
-              near_me
-            </span>
-            <span>Change Location</span>
-          </button>
-          <button
-            aria-label="Refresh telemetry"
-            className="p-2.5 rounded-xl bg-surface-container-lowest shadow-sm text-on-surface-variant hover:text-primary transition-colors"
-            type="button"
-          >
-            <span className="material-symbols-outlined text-[20px]">autorenew</span>
-          </button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
         <div className="lg:col-span-5 relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-xl shadow-sm flex flex-col justify-between">
-          <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-gradient-to-br from-secondary-container/20 to-transparent blur-2xl"></div>
+          <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-linear-to-br from-secondary-container/20 to-transparent blur-2xl"></div>
           <div className="flex items-start justify-between relative z-10">
             <div className="flex flex-col gap-1">
               <span className="font-label-sm text-label-sm uppercase tracking-wider text-outline font-semibold">
                 Live Telemetry
               </span>
               <span className="font-headline-md text-headline-md text-on-surface">
-                Coastal Marine Layer
+                {conditionText}
               </span>
             </div>
           </div>
@@ -82,17 +264,20 @@ function CurrentConditions() {
           <div className="my-space-xl relative z-10 flex flex-col">
             <div className="flex items-start">
               <span className="font-display-hero text-display-hero font-light text-on-surface tracking-tighter">
-                18
+                {temperature}
               </span>
               <span className="font-display-hero text-display-hero text-secondary font-light">°C</span>
             </div>
             <div className="flex items-center gap-space-sm mt-1">
               <span className="font-body-md text-body-md text-on-surface-variant">
-                Feels like <strong className="text-on-surface font-semibold">17°C</strong>
+                Feels like{' '}
+                <strong className="text-on-surface font-semibold">
+                  {formatTemperature(values.temperatureApparent)}
+                </strong>
               </span>
               <span className="w-1 h-1 rounded-full bg-outline-variant"></span>
               <span className="font-label-md text-label-md text-secondary font-medium">
-                Partly Cloudy &amp; Fresh Breeze
+                {windSummary}
               </span>
             </div>
           </div>
