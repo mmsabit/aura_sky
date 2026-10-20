@@ -1,7 +1,7 @@
 import { useState } from "react"
 import TempGraph, { type TemperatureMetric, type TemperaturePoint } from "./TempGraph"
-import { useHourlyHistory, type HourlyEntry } from "../../hooks/useHourlyHistory"
-import { usePlace } from "../../hooks/usePlace"
+import { useWeatherData } from "../../hooks/useWeatherData"
+import type { HourlyEntry } from "../../lib/weatherApi"
 
 const METRICS: { key: TemperatureMetric; label: string }[] = [
   { key: 'temperature', label: 'Temperature' },
@@ -34,13 +34,10 @@ function roundTemperature(value?: number) {
 }
 
 function TemperatureTrend() {
-  const { place: currentPlace, error: placeError } = usePlace()
+  const { city, history, historyError, locationError } = useWeatherData()
   const [metric, setMetric] = useState<TemperatureMetric>('temperature')
 
-  const city = currentPlace?.city ?? currentPlace?.locality ?? ''
-  const { hourly, error: historyError } = useHourlyHistory(city)
-
-  const entries = hourly ?? []
+  const entries = history ?? []
 
   const points: TemperaturePoint[] = entries.flatMap((entry) => {
     const temperature = roundTemperature(entry.values.temperature)
@@ -121,7 +118,7 @@ function TemperatureTrend() {
       ? 50
       : Math.min(90, Math.max(10, 10 + (focusIndex / (entries.length - 1)) * 80))
 
-  const statusMessage = placeError
+  const statusMessage = locationError
     ? 'Location unavailable — cannot load the history.'
     : historyError
       ? 'Temperature history unavailable right now.'

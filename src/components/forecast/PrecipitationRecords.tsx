@@ -8,8 +8,8 @@ import {
   YAxis,
   matchByDataKey,
 } from "recharts"
-import { useDailyForecast, type DailyEntry } from "../../hooks/useDailyWeather"
-import { usePlace } from "../../hooks/usePlace"
+import { useWeatherData } from "../../hooks/useWeatherData"
+import type { DailyEntry } from "../../lib/weatherApi"
 
 type View = 'rain' | 'snow' | 'combined'
 
@@ -63,12 +63,10 @@ function findLongestDryStreak(entries: DailyEntry[]) {
 }
 
 function PrecipitationRecords() {
-  const { place, error: placeError } = usePlace()
-  const city = place?.city ?? place?.locality ?? ''
-  const { daily, error: forecastError } = useDailyForecast(city)
+  const { city, forecast, forecastError, locationError } = useWeatherData()
   const [view, setView] = useState<View>('rain')
 
-  const entries = daily ?? []
+  const entries = forecast?.daily ?? []
   const hasData = entries.length > 0
 
   const points: ChartPoint[] = entries.map((entry) => ({
@@ -134,7 +132,7 @@ function PrecipitationRecords() {
     },
   ]
 
-  const statusMessage = placeError
+  const statusMessage = locationError
     ? 'Location unavailable — cannot load precipitation data.'
     : forecastError
       ? 'Precipitation forecast unavailable right now.'

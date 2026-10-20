@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { usePlace } from "../../hooks/usePlace";
+import { useWeatherData } from "../../hooks/useWeatherData";
+import { conditionLabel } from "../../lib/weather";
 
 type Metric = {
   label: string
@@ -10,66 +10,10 @@ type Metric = {
   headline?: boolean
 }
 
-type WeatherValues = {
-  temperature?: number
-  temperatureApparent?: number
-  humidity?: number
-  precipitationProbability?: number
-  rainIntensity?: number
-  sleetIntensity?: number
-  snowIntensity?: number
-  pressureSeaLevel?: number
-  windSpeed?: number
-  windDirection?: number
-  uvIndex?: number
-  weatherCode?: number
-}
-
-type RealtimeResponse = {
-  data?: {
-    time?: string
-    values?: WeatherValues
-  }
-}
-
-const WEATHER_CODES: Record<number, string> = {
-  1000: 'Clear',
-  1001: 'Cloudy',
-  1100: 'Mostly Clear',
-  1101: 'Partly Cloudy',
-  1102: 'Mostly Cloudy',
-  2000: 'Fog',
-  2100: 'Light Fog',
-  3000: 'Light Wind',
-  3001: 'Windy',
-  3002: 'Strong Wind',
-  4000: 'Drizzle',
-  4001: 'Rain',
-  4200: 'Light Rain',
-  4201: 'Heavy Rain',
-  5000: 'Snow',
-  5001: 'Flurries',
-  5100: 'Light Snow',
-  5101: 'Heavy Snow',
-  6000: 'Freezing Drizzle',
-  6001: 'Freezing Rain',
-  6200: 'Light Freezing Rain',
-  6201: 'Heavy Freezing Rain',
-  7000: 'Ice Pellets',
-  7101: 'Heavy Ice Pellets',
-  7102: 'Light Ice Pellets',
-  8000: 'Thunderstorm',
-}
-
 const COMPASS_POINTS = [
   'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
   'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW',
 ]
-
-function conditionLabel(code?: number) {
-  if (code === undefined) return 'Conditions unavailable'
-  return WEATHER_CODES[code] ?? 'Unknown conditions'
-}
 
 function windDirectionLabel(degrees?: number) {
   if (degrees === undefined || !Number.isFinite(degrees)) return ''
@@ -111,55 +55,13 @@ function formatUpdatedAt(iso?: string) {
 }
 
 function CurrentConditions() {
-  const { coords, place: location, error: locationError } = usePlace();
-  const [weather, setWeather] = useState<WeatherValues | null>(null);
-  const [observedAt, setObservedAt] = useState<string>();
-  const [weatherError, setWeatherError] = useState(false);
+  const { coords, placeLabel, placeError, forecast, forecastError, locationError } =
+    useWeatherData();
 
-  const place = location?.city ?? location?.locality ?? '';
+  const current = forecast?.current ?? null;
+  const values = current?.values ?? {};
+  const observedAt = current?.time;
 
-  useEffect(() => {
-    if (!place) return;
-
-    const controller = new AbortController();
-
-    const getWeather = async () => {
-      try {
-        const apiKey = import.meta.env.VITE_WEATHER_API;
-        if (!apiKey) throw new Error('Missing VITE_WEATHER_API environment variable');
-
-        const params = new URLSearchParams({
-          location: place,
-          apikey: apiKey,
-          units: 'metric',
-        });
-        const res = await fetch(
-          `https://api.tomorrow.io/v4/weather/realtime?${params.toString()}`,
-          { signal: controller.signal },
-        );
-        if (!res.ok) throw new Error(`Weather request failed: ${res.status}`);
-
-        const data: RealtimeResponse = await res.json();
-        if (!data.data?.values) throw new Error('Weather response is missing values');
-
-        setWeather(data.data.values);
-        setObservedAt(data.data.time);
-        setWeatherError(false);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        console.error(error);
-        setWeather(null);
-        setObservedAt(undefined);
-        setWeatherError(true);
-      }
-    };
-
-    getWeather();
-
-    return () => controller.abort();
-  }, [place]);
-
-  const values = weather ?? {};
   const precipitationIntensity =
     (values.rainIntensity ?? 0) + (values.sleetIntensity ?? 0) + (values.snowIntensity ?? 0);
   const windSpeedKmh =
@@ -208,13 +110,11 @@ function CurrentConditions() {
     },
   ];
 
-  const placeLabel = location
-    ? [place, location.principalSubdivision].filter(Boolean).join(', ')
-    : '';
-  const displayPlace = placeLabel || (locationError ? 'Location unavailable' : 'Locating…');
-  const conditionText = weatherError
+  const displayPlace =
+    placeLabel || (locationError || placeError ? 'Location unavailable' : 'Locating…');
+  const conditionText = forecastError
     ? 'Weather unavailable'
-    : weather
+    : current
       ? conditionLabel(values.weatherCode)
       : 'Fetching conditions…';
   const temperature = values.temperature === undefined ? '—' : Math.round(values.temperature);
@@ -236,7 +136,7 @@ function CurrentConditions() {
               <span className="material-symbols-outlined text-[14px] text-secondary">explore</span>
               {coords
                 ? `${coords.latitude.toFixed(6)}°, ${coords.longitude.toFixed(6)}°`
-                : 'Waiting for GPS'}
+                : 'Default location'}
             </span>
           </div>
           <div className="flex items-baseline gap-space-sm pt-space-2xs">

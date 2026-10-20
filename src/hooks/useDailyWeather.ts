@@ -7,6 +7,7 @@ export type DailyValues = {
   rainAccumulationSum?: number
   snowAccumulationSum?: number
   precipitationProbabilityMax?: number
+  weatherCodeMax?: number
 }
 
 export type DailyEntry = {

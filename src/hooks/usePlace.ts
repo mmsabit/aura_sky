@@ -7,9 +7,17 @@ export type Place = {
   principalSubdivision?: string
 }
 
+export const DEFAULT_PLACE: Place = {
+  city: 'New York',
+  locality: 'New York',
+  principalSubdivision: 'New York',
+}
+
+const GEOLOCATION_OPTIONS = { userDecisionTimeout: 8000 }
+
 let cachedGeocode: { key: string; request: Promise<Place> } | null = null
 
-function reverseGeocode(latitude: number, longitude: number) {
+export function reverseGeocode(latitude: number, longitude: number) {
   const key = `${latitude},${longitude}`
   if (cachedGeocode?.key === key) return cachedGeocode.request
 
@@ -35,12 +43,16 @@ function reverseGeocode(latitude: number, longitude: number) {
 }
 
 export function usePlace() {
-  const { coords } = useGeolocated({})
+  const { coords, isGeolocationAvailable, isGeolocationEnabled, positionError } =
+    useGeolocated(GEOLOCATION_OPTIONS)
   const latitude = coords?.latitude
   const longitude = coords?.longitude
 
   const [place, setPlace] = useState<Place | null>(null)
   const [error, setError] = useState(false)
+
+  const geolocationFailed =
+    !isGeolocationAvailable || !isGeolocationEnabled || positionError !== undefined
 
   useEffect(() => {
     if (latitude === undefined || longitude === undefined) return
@@ -64,5 +76,7 @@ export function usePlace() {
     }
   }, [latitude, longitude])
 
-  return { coords, place, error }
+  const resolvedPlace = place ?? (geolocationFailed ? DEFAULT_PLACE : null)
+
+  return { coords, place: resolvedPlace, error }
 }
