@@ -1,33 +1,145 @@
-const views = ['Rainfall (mm)', 'Snowfall (cm)', 'Combined View']
+import { useState } from "react"
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Tooltip,
+  XAxis,
+  YAxis,
+  matchByDataKey,
+} from "recharts"
+import { useDailyForecast, type DailyEntry } from "../../hooks/useDailyForecast"
+import { usePlace } from "../../hooks/usePlace"
 
-const stats = [
-  {
-    label: 'Total Rainfall',
-    value: '24.9 mm',
-    note: '-22% vs 10-yr average (32mm)',
-    noteClass: 'text-primary font-semibold',
-  },
-  {
-    label: 'Measurable Rain Days',
-    value: '5 Days',
-    note: 'Normal range (4–6 days)',
-    noteClass: 'text-on-surface-variant font-medium',
-  },
-  {
-    label: 'Snowfall Recorded',
-    value: '0.0 cm',
-    note: 'Elev. threshold not reached',
-    noteClass: 'text-on-surface-variant font-medium',
-  },
-  {
-    label: 'Longest Dry Streak',
-    value: '12 Days',
-    note: 'Oct 11 – Oct 22 active',
-    noteClass: 'text-secondary font-medium',
-  },
+type View = 'rain' | 'snow' | 'combined'
+
+type ChartPoint = {
+  label: string
+  rain: number
+  snow: number
+}
+
+const VIEWS: { key: View; label: string }[] = [
+  { key: 'rain', label: 'Rainfall (mm)' },
+  { key: 'snow', label: 'Snowfall (mm)' },
+  { key: 'combined', label: 'Combined View' },
 ]
 
+const MEASURABLE_RAIN_MM = 0.2
+
+function formatDay(iso: string, options: Intl.DateTimeFormatOptions) {
+  const date = new Date(iso)
+  if (Number.isNaN(date.getTime())) return '—'
+  return date.toLocaleDateString(undefined, { ...options, timeZone: 'UTC' })
+}
+
+function round1(value?: number) {
+  return value === undefined || !Number.isFinite(value) ? 0 : Math.round(value * 10) / 10
+}
+
+function sum(values: number[]) {
+  return values.reduce((total, value) => total + value, 0)
+}
+
+function findLongestDryStreak(entries: DailyEntry[]) {
+  let longest = { length: 0, start: '', end: '' }
+  let current = { length: 0, start: '' }
+
+  entries.forEach((entry) => {
+    if (round1(entry.values.rainAccumulationSum) >= MEASURABLE_RAIN_MM) {
+      current = { length: 0, start: '' }
+      return
+    }
+
+    if (current.length === 0) current.start = entry.time
+    current.length += 1
+
+    if (current.length > longest.length) {
+      longest = { length: current.length, start: current.start, end: entry.time }
+    }
+  })
+
+  return longest
+}
+
 function PrecipitationRecords() {
+  const { place, error: placeError } = usePlace()
+  const city = place?.city ?? place?.locality ?? ''
+  const { daily, error: forecastError } = useDailyForecast(city)
+  const [view, setView] = useState<View>('rain')
+
+  const entries = daily ?? []
+  const hasData = entries.length > 0
+
+  const points: ChartPoint[] = entries.map((entry) => ({
+    label: formatDay(entry.time, { weekday: 'short', day: 'numeric' }),
+    rain: round1(entry.values.rainAccumulationSum),
+    snow: round1(entry.values.snowAccumulationSum),
+  }))
+
+  const totalRain = round1(sum(points.map((point) => point.rain)))
+  const totalSnow = round1(sum(points.map((point) => point.snow)))
+  const rainDays = points.filter((point) => point.rain >= MEASURABLE_RAIN_MM).length
+  const dryStreak = findLongestDryStreak(entries)
+
+  const wettestIndex = points.reduce(
+    (best, point, index) => (point.rain > points[best].rain ? index : best),
+    0,
+  )
+  const wettest = points.length > 0 ? points[wettestIndex] : null
+  const wettestProbability = wettest
+    ? Math.round(entries[wettestIndex].values.precipitationProbabilityMax ?? 0)
+    : 0
+  const wettestLabel = wettest
+    ? formatDay(entries[wettestIndex].time, { weekday: 'long', month: 'short', day: 'numeric' })
+    : ''
+
+  const rainDayLabel = `${rainDays} ${rainDays === 1 ? 'Day' : 'Days'}`
+  const dryStreakLabel = `${dryStreak.length} ${dryStreak.length === 1 ? 'Day' : 'Days'}`
+  const dryStreakNote =
+    dryStreak.length > 0
+      ? `${formatDay(dryStreak.start, { month: 'short', day: 'numeric' })} – ${formatDay(dryStreak.end, { month: 'short', day: 'numeric' })}`
+      : 'No dry days in outlook'
+
+  const stats = [
+    {
+      label: 'Total Rainfall',
+      value: hasData ? `${totalRain.toFixed(1)} mm` : '—',
+      note: hasData
+        ? `${rainDays} of ${points.length} days with measurable rain`
+        : 'Waiting for forecast',
+      noteClass:
+        hasData && rainDays > 0 ? 'text-primary font-semibold' : 'text-on-surface-variant font-medium',
+    },
+    {
+      label: 'Measurable Rain Days',
+      value: hasData ? rainDayLabel : '—',
+      note: hasData ? 'At least 0.2 mm per day' : 'Waiting for forecast',
+      noteClass: 'text-on-surface-variant font-medium',
+    },
+    {
+      label: 'Snowfall Recorded',
+      value: hasData ? `${totalSnow.toFixed(1)} mm` : '—',
+      note:
+        hasData && totalSnow > 0
+          ? 'Accumulated over the outlook'
+          : 'No snow in this outlook',
+      noteClass: 'text-on-surface-variant font-medium',
+    },
+    {
+      label: 'Longest Dry Streak',
+      value: hasData ? dryStreakLabel : '—',
+      note: hasData ? dryStreakNote : 'Waiting for forecast',
+      noteClass: 'text-secondary font-medium',
+    },
+  ]
+
+  const statusMessage = placeError
+    ? 'Location unavailable — cannot load precipitation data.'
+    : forecastError
+      ? 'Precipitation forecast unavailable right now.'
+      : 'Loading precipitation outlook…'
+
   return (
     <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg lg:p-space-xl shadow-sm">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-space-md pb-space-xs">
@@ -35,26 +147,27 @@ function PrecipitationRecords() {
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-secondary text-[22px]">cloud_sync</span>
             <h2 className="font-headline-md text-headline-md text-on-surface font-semibold">
-              Monthly Precipitation &amp; Snowfall Records
+              7-Day Precipitation Outlook
             </h2>
           </div>
           <p className="font-body-sm text-body-sm text-on-surface-variant">
-            Historical rainfall volume, precipitation probability, and snowfall accumulation over the past 30
-            days
+            Daily rainfall and snowfall accumulation
+            {city ? ` for ${city}` : ''}
           </p>
         </div>
         <div className="inline-flex p-1 rounded-xl bg-surface-container-low self-start sm:self-auto">
-          {views.map((view, index) => (
+          {VIEWS.map((option) => (
             <button
-              key={view}
+              key={option.key}
               className={
-                index === 0
+                option.key === view
                   ? 'px-3 py-1.5 rounded-lg bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md font-semibold'
                   : 'px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors'
               }
+              onClick={() => setView(option.key)}
               type="button"
             >
-              {view}
+              {option.label}
             </button>
           ))}
         </div>
@@ -62,127 +175,110 @@ function PrecipitationRecords() {
 
       <div className="flex items-center gap-space-sm p-3 rounded-lg bg-surface-container-low text-secondary font-body-sm text-body-sm">
         <span className="material-symbols-outlined text-[18px]">info</span>
-        <span>
-          Atmospheric River system passed through North Coast during <strong>Oct 8–10</strong>, providing 74%
-          of the monthly total moisture.
-        </span>
+        {!hasData ? (
+          <span>{statusMessage}</span>
+        ) : wettest && wettest.rain >= MEASURABLE_RAIN_MM ? (
+          <span>
+            Wettest day in this outlook: <strong>{wettestLabel}</strong> with{' '}
+            {wettest.rain.toFixed(1)} mm of rain ({wettestProbability}% chance).
+          </span>
+        ) : (
+          <span>
+            No measurable precipitation is projected over the next {points.length} days.
+          </span>
+        )}
       </div>
 
       <div className="relative w-full overflow-x-auto pt-space-xs">
         <div className="min-w-170">
-          <svg
-            className="w-full h-64 overflow-visible"
-            fill="none"
-            viewBox="0 0 800 230"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <line stroke="#F1F5F9" strokeWidth="1" x1="50" x2="780" y1="20" y2="20"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="10" textAnchor="end" x="35" y="24">
-              25mm / 100%
-            </text>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="50" x2="780" y1="70" y2="70"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="10" textAnchor="end" x="35" y="74">
-              18mm / 75%
-            </text>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="50" x2="780" y1="120" y2="120"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="10" textAnchor="end" x="35" y="124">
-              10mm / 50%
-            </text>
-            <line stroke="#F1F5F9" strokeWidth="1" x1="50" x2="780" y1="170" y2="170"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="10" textAnchor="end" x="35" y="174">
-              3mm / 25%
-            </text>
-            <line stroke="#E2E8F0" strokeWidth="1" x1="50" x2="780" y1="200" y2="200"></line>
-            <text fill="#94A3B8" fontFamily="Inter" fontSize="10" textAnchor="end" x="35" y="204">
-              0mm / 0%
-            </text>
-
-            <line stroke="#BAE6FD" strokeDasharray="4 4" strokeWidth="1" x1="50" x2="780" y1="135" y2="135"></line>
-            <text
-              fill="#00668A"
-              fontFamily="Inter"
-              fontSize="10"
-              fontWeight="500"
-              textAnchor="end"
-              x="775"
-              y="130"
+          {hasData ? (
+            <BarChart
+              style={{
+                width: '100%',
+                height: '100%',
+                maxHeight: '70vh',
+                aspectRatio: 2.4,
+              }}
+              responsive
+              data={points}
+              margin={{ top: 8, right: 12, left: 0, bottom: 5 }}
+              barCategoryGap="28%"
             >
-              Historical Normal (8mm/wk)
-            </text>
-
-            <rect
-              className="hover:fill-secondary-container transition-colors"
-              fill="#BAE6FD"
-              height="34"
-              rx="6"
-              width="64"
-              x="110"
-              y="166"
-            ></rect>
-            <text fill="#00668A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="142" y="158">
-              4.2 mm
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="11" fontWeight="500" textAnchor="middle" x="142" y="218">
-              Week 1 (Oct 1-7)
-            </text>
-
-            <rect
-              className="hover:opacity-90 transition-opacity"
-              fill="#0284C7"
-              height="135"
-              rx="6"
-              width="64"
-              x="290"
-              y="65"
-            ></rect>
-            <text fill="#0284C7" fontFamily="Plus Jakarta Sans" fontSize="12" fontWeight="700" textAnchor="middle" x="322" y="55">
-              18.6 mm
-            </text>
-            <text fill="#0284C7" fontFamily="Inter" fontSize="11" fontWeight="600" textAnchor="middle" x="322" y="218">
-              Week 2 (Oct 8-14)
-            </text>
-
-            <rect fill="#F0F9FF" height="24" rx="4" width="144" x="250" y="12"></rect>
-            <text fill="#00668A" fontFamily="Inter" fontSize="10" fontWeight="600" textAnchor="middle" x="322" y="28">
-              Atmospheric River Event
-            </text>
-
-            <rect
-              className="hover:fill-secondary-container transition-colors"
-              fill="#BAE6FD"
-              height="18"
-              rx="4"
-              width="64"
-              x="470"
-              y="182"
-            ></rect>
-            <text fill="#00668A" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="502" y="174">
-              2.1 mm
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="11" fontWeight="500" textAnchor="middle" x="502" y="218">
-              Week 3 (Oct 15-21)
-            </text>
-
-            <rect fill="#CBD5E1" height="2" rx="1" width="64" x="650" y="198"></rect>
-            <text fill="#94A3B8" fontFamily="Plus Jakarta Sans" fontSize="11" fontWeight="600" textAnchor="middle" x="682" y="190">
-              0.0 mm
-            </text>
-            <text fill="#64748B" fontFamily="Inter" fontSize="11" fontWeight="500" textAnchor="middle" x="682" y="218">
-              Week 4 (Oct 22-28)
-            </text>
-
-            <path
-              d="M 142,150 C 220,150 250,30 322,30 C 400,30 430,165 502,165 C 570,165 620,192 682,192"
-              fill="none"
-              stroke="#38BDF8"
-              strokeLinecap="round"
-              strokeWidth="2.5"
-            ></path>
-            <circle cx="142" cy="150" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="322" cy="30" fill="#38BDF8" r="4" stroke="#FFFFFF" strokeWidth="2"></circle>
-            <circle cx="502" cy="165" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-            <circle cx="682" cy="192" fill="#FFFFFF" r="3.5" stroke="#38BDF8" strokeWidth="2"></circle>
-          </svg>
+              <CartesianGrid stroke="#e2e7ff" strokeDasharray="4 4" vertical={false} />
+              <XAxis
+                dataKey="label"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 11, fill: '#707881' }}
+              />
+              <YAxis
+                width="auto"
+                tickLine={false}
+                axisLine={false}
+                tick={{ fontSize: 11, fill: '#707881' }}
+                unit=" mm"
+                tickFormatter={(value) => `${Math.round(Number(value) * 10) / 10}`}
+              />
+              <Tooltip
+                cursor={{ fill: '#f2f3ff' }}
+                contentStyle={{
+                  borderRadius: 12,
+                  border: '1px solid #e2e7ff',
+                  fontSize: 12,
+                }}
+              />
+              {view === 'rain' ? (
+                <Bar
+                  dataKey="rain"
+                  name="Rainfall"
+                  unit=" mm"
+                  fill="#006194"
+                  radius={[6, 6, 0, 0]}
+                  animationDuration={900}
+                  animationMatchBy={matchByDataKey('label')}
+                />
+              ) : null}
+              {view === 'snow' ? (
+                <Bar
+                  dataKey="snow"
+                  name="Snowfall"
+                  unit=" mm"
+                  fill="#40c2fd"
+                  radius={[6, 6, 0, 0]}
+                  animationDuration={900}
+                  animationMatchBy={matchByDataKey('label')}
+                />
+              ) : null}
+              {view === 'combined' ? (
+                <>
+                  <Bar
+                    dataKey="rain"
+                    name="Rainfall"
+                    unit=" mm"
+                    stackId="combined"
+                    fill="#006194"
+                    radius={[6, 6, 0, 0]}
+                    animationDuration={900}
+                    animationMatchBy={matchByDataKey('label')}
+                  />
+                  <Bar
+                    dataKey="snow"
+                    name="Snowfall"
+                    unit=" mm"
+                    stackId="combined"
+                    fill="#40c2fd"
+                    radius={[6, 6, 0, 0]}
+                    animationDuration={900}
+                    animationMatchBy={matchByDataKey('label')}
+                  />
+                </>
+              ) : null}
+            </BarChart>
+          ) : (
+            <div className="flex h-64 items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
+              {statusMessage}
+            </div>
+          )}
         </div>
       </div>
 

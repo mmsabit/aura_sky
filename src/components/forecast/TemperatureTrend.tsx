@@ -1,23 +1,7 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import TempGraph, { type TemperatureMetric, type TemperaturePoint } from "./TempGraph"
+import { useDailyForecast, type DailyEntry } from "../../hooks/useDailyForecast"
 import { usePlace } from "../../hooks/usePlace"
-
-type DailyValues = {
-  temperatureMax?: number
-  temperatureMin?: number
-  temperatureAvg?: number
-}
-
-type DailyEntry = {
-  time: string
-  values: DailyValues
-}
-
-type ForecastResponse = {
-  timelines?: {
-    daily?: DailyEntry[]
-  }
-}
 
 const METRICS: { key: TemperatureMetric; label: string }[] = [
   { key: 'max', label: 'High' },
@@ -43,52 +27,10 @@ function roundTemperature(value?: number) {
 
 function TemperatureTrend() {
   const { place: currentPlace, error: placeError } = usePlace()
-  const [daily, setDaily] = useState<DailyEntry[] | null>(null)
-  const [forecastError, setForecastError] = useState(false)
   const [metric, setMetric] = useState<TemperatureMetric>('max')
 
   const city = currentPlace?.city ?? currentPlace?.locality ?? ''
-
-  useEffect(() => {
-    if (!city) return
-
-    const controller = new AbortController()
-
-    const getForecast = async () => {
-      try {
-        const apiKey = import.meta.env.VITE_WEATHER_API
-        if (!apiKey) throw new Error('Missing VITE_WEATHER_API environment variable')
-
-        const params = new URLSearchParams({
-          location: city,
-          timesteps: '1d',
-          apikey: apiKey,
-          units: 'metric',
-        })
-        const res = await fetch(
-          `https://api.tomorrow.io/v4/weather/forecast?${params.toString()}`,
-          { signal: controller.signal },
-        )
-        if (!res.ok) throw new Error(`Forecast request failed: ${res.status}`)
-
-        const data: ForecastResponse = await res.json()
-        const entries = data.timelines?.daily ?? []
-        if (entries.length === 0) throw new Error('Forecast response is missing daily data')
-
-        setDaily(entries)
-        setForecastError(false)
-      } catch (error) {
-        if (controller.signal.aborted) return
-        console.error(error)
-        setDaily(null)
-        setForecastError(true)
-      }
-    }
-
-    getForecast()
-
-    return () => controller.abort()
-  }, [city])
+  const { daily, error: forecastError } = useDailyForecast(city)
 
   const entries = daily ?? []
 
