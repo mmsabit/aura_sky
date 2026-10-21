@@ -1,3 +1,5 @@
+import { createCachedRequest } from './requestCache'
+
 export type WeatherValues = {
   temperature?: number
   temperatureApparent?: number
@@ -55,20 +57,8 @@ type HistoryResponse = {
   }
 }
 
-type CacheEntry<T> = {
-  key: string
-  timestamp: number
-  request: Promise<T>
-}
-
-const CACHE_TTL_MS = 5 * 60 * 1000
-
-let cachedForecast: CacheEntry<ForecastData> | null = null
-let cachedHistory: CacheEntry<HourlyEntry[]> | null = null
-
-function isFresh<T>(cache: CacheEntry<T> | null, key: string) {
-  return cache !== null && cache.key === key && Date.now() - cache.timestamp < CACHE_TTL_MS
-}
+const forecastCache = createCachedRequest<ForecastData>('forecast')
+const historyCache = createCachedRequest<HourlyEntry[]>('history')
 
 function readApiKey() {
   const apiKey = import.meta.env.VITE_WEATHER_API
@@ -140,25 +130,9 @@ async function loadHistory(location: string): Promise<HourlyEntry[]> {
 }
 
 export function fetchForecast(location: string) {
-  if (isFresh(cachedForecast, location)) return cachedForecast!.request
-
-  const request = loadForecast(location)
-  cachedForecast = { key: location, timestamp: Date.now(), request }
-  request.catch(() => {
-    if (cachedForecast?.key === location) cachedForecast = null
-  })
-
-  return request
+  return forecastCache(location, () => loadForecast(location))
 }
 
 export function fetchHistory(location: string) {
-  if (isFresh(cachedHistory, location)) return cachedHistory!.request
-
-  const request = loadHistory(location)
-  cachedHistory = { key: location, timestamp: Date.now(), request }
-  request.catch(() => {
-    if (cachedHistory?.key === location) cachedHistory = null
-  })
-
-  return request
+  return historyCache(location, () => loadHistory(location))
 }

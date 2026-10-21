@@ -39,6 +39,11 @@ const metaLinks = [
   { label: 'Satellite Mesh', ariaLabel: 'Satellite Constellation' },
 ]
 
+const PAGE_LINKS: Record<string, string> = {
+  forecast: '#/forecast',
+  'radar-and-map': '#/radar-and-map',
+}
+
 function SiteFooter() {
   return (
     <footer className="w-full bg-surface-container-low shadow-[0_-1px_12px_rgba(0,0,0,0.02)]">
@@ -63,16 +68,28 @@ function SiteFooter() {
             <div key={column.title} className="flex flex-col gap-space-sm">
               <span className="font-headline-sm text-headline-sm text-on-surface">{column.title}</span>
               <nav className="flex flex-col gap-space-xs">
-                {column.links.map((link) => (
-                  <a
-                    key={link.path}
-                    className="font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors"
-                    data-path={link.path}
-                    href="#"
-                  >
-                    {link.label}
-                  </a>
-                ))}
+                {column.links.map((link) => {
+                  const href = PAGE_LINKS[link.path]
+
+                  return (
+                    <a
+                      key={link.path}
+                      aria-disabled={href ? undefined : true}
+                      className={
+                        href
+                          ? 'font-body-sm text-body-sm text-on-surface-variant hover:text-primary transition-colors'
+                          : 'font-body-sm text-body-sm text-on-surface-variant/50 cursor-not-allowed'
+                      }
+                      data-path={link.path}
+                      href={href ?? '#'}
+                      onClick={
+                        href ? undefined : (event) => event.preventDefault()
+                      }
+                    >
+                      {link.label}
+                    </a>
+                  )
+                })}
               </nav>
             </div>
           ))}

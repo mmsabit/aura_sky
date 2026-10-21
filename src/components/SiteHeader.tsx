@@ -1,19 +1,24 @@
 import logo from '../assets/logo.png'
 import avatar from '../assets/avatar.jpg'
+import type { Route } from '../hooks/useHashRoute'
 
 const navLinks = [
-  { label: 'Forecast', path: 'forecast', active: true },
+  { label: 'Forecast', path: 'forecast' },
   { label: 'Radar & Map', path: 'radar-and-map' },
   { label: 'Air Quality', path: 'air-quality' },
   { label: 'Alerts', path: 'alerts' },
-]
+] as const
 
-function SiteHeader() {
+type SiteHeaderProps = {
+  activePath: Route
+}
+
+function SiteHeader({ activePath }: SiteHeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
       <div className="h-20 w-full max-w-[1360px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop flex items-center justify-between gap-space-lg">
         <div className="flex items-center gap-space-lg flex-shrink-0">
-          <a className="flex items-center gap-space-xs" data-path="forecast" href="#">
+          <a className="flex items-center gap-space-xs" data-path="forecast" href="#/forecast">
             <img alt="Aura Sky Logo" className="w-auto object-contain h-10" src={logo} />
           </a>
         </div>
@@ -36,21 +41,33 @@ function SiteHeader() {
         </div>
 
         <nav className="hidden lg:flex items-center gap-space-sm">
-          {navLinks.map((link) => (
-            <a
-              key={link.path}
-              aria-current={link.active ? 'page' : undefined}
-              className={
-                link.active
-                  ? 'transition-all bg-primary-container text-on-primary-container font-semibold rounded px-space-sm py-1.5'
-                  : 'font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low px-space-sm py-1.5 rounded transition-all'
-              }
-              data-path={link.path}
-              href="#"
-            >
-              {link.label}
-            </a>
-          ))}
+          {navLinks.map((link) => {
+            const isActive = link.path === activePath
+            const isAvailable = link.path === 'forecast' || link.path === 'radar-and-map'
+
+            return (
+              <a
+                key={link.path}
+                aria-current={isActive ? 'page' : undefined}
+                aria-disabled={isAvailable ? undefined : true}
+                className={
+                  isActive
+                    ? 'transition-all bg-primary-container text-on-primary-container font-semibold rounded px-space-sm py-1.5'
+                    : isAvailable
+                      ? 'font-body-md text-body-md text-on-surface-variant hover:text-on-surface hover:bg-surface-container-low px-space-sm py-1.5 rounded transition-all'
+                      : 'font-body-md text-body-md text-on-surface-variant/50 cursor-not-allowed px-space-sm py-1.5 rounded'
+                }
+                data-path={link.path}
+                href={isAvailable ? `#/${link.path}` : '#'}
+                onClick={
+                  isAvailable ? undefined : (event) => event.preventDefault()
+                }
+                title={isAvailable ? undefined : 'Coming soon'}
+              >
+                {link.label}
+              </a>
+            )
+          })}
         </nav>
 
         <div className="flex items-center gap-space-sm flex-shrink-0">
