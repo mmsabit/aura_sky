@@ -12,6 +12,9 @@ export type WeatherValues = {
   windSpeed?: number
   windDirection?: number
   uvIndex?: number
+  cloudCover?: number
+  dewPoint?: number
+  visibility?: number
   weatherCode?: number
 }
 
@@ -41,6 +44,28 @@ export type ForecastData = {
   locationName?: string
 }
 
+export type RealtimeData = {
+  time: string
+  values: WeatherValues
+  location: {
+    name?: string
+    lat?: number
+    lon?: number
+  }
+}
+
+type RealtimeResponse = {
+  data?: {
+    time?: string
+    values?: WeatherValues
+  }
+  location?: {
+    name?: string
+    lat?: number
+    lon?: number
+  }
+}
+
 type ForecastResponse = {
   timelines?: {
     hourly?: HourlyEntry[]
@@ -59,6 +84,7 @@ type HistoryResponse = {
 
 const forecastCache = createCachedRequest<ForecastData>('forecast')
 const historyCache = createCachedRequest<HourlyEntry[]>('history')
+const realtimeCache = createCachedRequest<RealtimeData>('realtime', 2 * 60 * 1000)
 
 function readApiKey() {
   const apiKey = import.meta.env.VITE_WEATHER_API
@@ -135,4 +161,33 @@ export function fetchForecast(location: string) {
 
 export function fetchHistory(location: string) {
   return historyCache(location, () => loadHistory(location))
+}
+
+async function loadRealtime(location: string): Promise<RealtimeData> {
+  const params = new URLSearchParams({
+    location,
+    apikey: readApiKey(),
+    units: 'metric',
+  })
+
+  const res = await fetch(
+    `https://api.tomorrow.io/v4/weather/realtime?${params.toString()}`,
+  )
+  if (!res.ok) throw new Error(`Realtime weather request failed: ${res.status}`)
+
+  const data: RealtimeResponse = await res.json()
+  if (!data.data?.time || !data.data.values) {
+    throw new Error('Realtime weather response is missing data')
+  }
+
+  return {
+    time: data.data.time,
+    values: data.data.values,
+    location: data.location ?? {},
+  }
+}
+
+/** Current conditions for a single place, using the Tomorrow.io realtime endpoint. */
+export function fetchRealtime(location: string) {
+  return realtimeCache(location, () => loadRealtime(location))
 }

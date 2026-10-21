@@ -1,12 +1,11 @@
 import logo from '../assets/logo.png'
 import avatar from '../assets/avatar.jpg'
-import type { Route } from '../hooks/useHashRoute'
+import LocationSearch from './search/LocationSearch'
+import type { Route } from '../hooks/useRoute'
 
 const navLinks = [
   { label: 'Forecast', path: 'forecast' },
   { label: 'Radar & Map', path: 'radar-and-map' },
-  { label: 'Air Quality', path: 'air-quality' },
-  { label: 'Alerts', path: 'alerts' },
 ] as const
 
 type SiteHeaderProps = {
@@ -16,28 +15,15 @@ type SiteHeaderProps = {
 function SiteHeader({ activePath }: SiteHeaderProps) {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
-      <div className="h-20 w-full max-w-[1360px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop flex items-center justify-between gap-space-lg">
-        <div className="flex items-center gap-space-lg flex-shrink-0">
-          <a className="flex items-center gap-space-xs" data-path="forecast" href="#/forecast">
+      <div className="h-20 w-full max-w-340 mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop flex items-center justify-between gap-space-lg">
+        <div className="flex items-center gap-space-lg shrink-0">
+          <a className="flex items-center gap-space-xs" data-path="forecast" href="/forecast">
             <img alt="Aura Sky Logo" className="w-auto object-contain h-10" src={logo} />
           </a>
         </div>
 
         <div className="hidden xl:flex items-center flex-1 max-w-md">
-          <div className="w-full flex items-center justify-between px-space-md py-space-xs rounded bg-surface-container-lowest shadow-[0_2px_12px_rgba(2,132,199,0.04)] focus-within:ring-2 focus-within:ring-secondary/30 transition-all">
-            <div className="flex items-center gap-space-xs flex-1">
-              <span className="material-symbols-outlined text-outline text-[18px]">search</span>
-              <input
-                aria-label="Search city or location"
-                className="w-full bg-transparent font-body-sm text-body-sm text-on-surface placeholder:text-outline focus:outline-none"
-                placeholder="Search city or location (e.g. San Francisco, Tokyo)..."
-                type="text"
-              />
-            </div>
-            <kbd className="hidden sm:inline-block px-1.5 py-0.5 rounded bg-surface-container font-label-sm text-label-sm text-on-surface-variant font-semibold">
-              ⌘K
-            </kbd>
-          </div>
+          <LocationSearch />
         </div>
 
         <nav className="hidden lg:flex items-center gap-space-sm">
@@ -58,7 +44,7 @@ function SiteHeader({ activePath }: SiteHeaderProps) {
                       : 'font-body-md text-body-md text-on-surface-variant/50 cursor-not-allowed px-space-sm py-1.5 rounded'
                 }
                 data-path={link.path}
-                href={isAvailable ? `#/${link.path}` : '#'}
+                href={isAvailable ? `/${link.path}` : '#'}
                 onClick={
                   isAvailable ? undefined : (event) => event.preventDefault()
                 }
@@ -70,7 +56,14 @@ function SiteHeader({ activePath }: SiteHeaderProps) {
           })}
         </nav>
 
-        <div className="flex items-center gap-space-sm flex-shrink-0">
+        <div className="flex items-center gap-space-sm shrink-0">
+          <a
+            aria-label="Search locations"
+            className="p-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors xl:hidden"
+            href="/search"
+          >
+            <span className="material-symbols-outlined text-[20px]">search</span>
+          </a>
           <button
             aria-label="Notifications"
             className="relative p-2 rounded text-on-surface-variant hover:text-on-surface hover:bg-surface-container transition-colors"

@@ -40,14 +40,14 @@ const metaLinks = [
 ]
 
 const PAGE_LINKS: Record<string, string> = {
-  forecast: '#/forecast',
-  'radar-and-map': '#/radar-and-map',
+  forecast: '/forecast',
+  'radar-and-map': '/radar-and-map',
 }
 
 function SiteFooter() {
   return (
     <footer className="w-full bg-surface-container-low shadow-[0_-1px_12px_rgba(0,0,0,0.02)]">
-      <div className="w-full max-w-[1360px] mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-space-2xl">
+      <div className="w-full max-w-340 mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop py-space-2xl">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-space-xl pb-space-2xl">
           <div className="lg:col-span-2 flex flex-col gap-space-md">
             <div className="flex items-center gap-space-xs">
@@ -106,6 +106,7 @@ function SiteFooter() {
                 aria-label={link.ariaLabel}
                 className="font-label-md text-label-md hover:text-primary transition-colors"
                 href="#"
+                onClick={(event) => event.preventDefault()}
               >
                 {link.label}
               </a>

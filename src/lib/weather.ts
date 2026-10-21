@@ -41,3 +41,22 @@ export function weatherIcon(code?: number) {
   if (code === undefined) return 'cloud'
   return WEATHER_CODES[code]?.icon ?? 'cloud'
 }
+
+const COMPASS_POINTS = [
+  'N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW',
+]
+
+export function windDirectionLabel(degrees?: number) {
+  if (degrees === undefined || !Number.isFinite(degrees)) return ''
+  return COMPASS_POINTS[Math.round(degrees / 22.5) % 16]
+}
+
+export function uvSeverity(uv?: number) {
+  if (uv === undefined || !Number.isFinite(uv)) return ''
+  if (uv < 3) return 'Low'
+  if (uv < 6) return 'Moderate'
+  if (uv < 8) return 'High'
+  if (uv < 11) return 'Very High'
+  return 'Extreme'
+}
