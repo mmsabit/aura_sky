@@ -1,5 +1,6 @@
 import { useState } from "react"
 import TempGraph, { type TemperatureMetric, type TemperaturePoint } from "./TempGraph"
+import Loading from "../Loading"
 import { useWeatherData } from "../../hooks/useWeatherData"
 import type { HourlyEntry } from "../../lib/weatherApi"
 
@@ -34,7 +35,7 @@ function roundTemperature(value?: number) {
 }
 
 function TemperatureTrend() {
-  const { city, history, historyError, locationError } = useWeatherData()
+  const { city, history, historyError, historyLoading, locationError } = useWeatherData()
   const [metric, setMetric] = useState<TemperatureMetric>('temperature')
 
   const entries = history ?? []
@@ -122,7 +123,7 @@ function TemperatureTrend() {
     ? 'Location unavailable — cannot load the history.'
     : historyError
       ? 'Temperature history unavailable right now.'
-      : 'Loading temperature history…'
+      : 'No temperature history available.'
 
   return (
     <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg lg:p-space-xl shadow-sm">
@@ -195,6 +196,10 @@ function TemperatureTrend() {
 
           {points.length > 0 ? (
             <TempGraph data={points} metric={metric} />
+          ) : historyLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loading compact label="Loading temperature history…" />
+            </div>
           ) : (
             <div className="flex h-64 items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
               {statusMessage}

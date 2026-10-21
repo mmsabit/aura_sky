@@ -7,6 +7,8 @@ export type WeatherContextValue = {
   placeLabel: string
   forecast: ForecastData | null
   history: HourlyEntry[] | null
+  forecastLoading: boolean
+  historyLoading: boolean
   forecastError: boolean
   historyError: boolean
   locationError: boolean

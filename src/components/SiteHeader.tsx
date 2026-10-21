@@ -14,7 +14,7 @@ type SiteHeaderProps = {
 
 function SiteHeader({ activePath }: SiteHeaderProps) {
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
+    <header className="z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
       <div className="h-20 w-full max-w-340 mx-auto px-margin md:px-margin-tablet lg:px-margin-desktop flex items-center justify-between gap-space-lg">
         <div className="flex items-center gap-space-lg shrink-0">
           <a className="flex items-center gap-space-xs" data-path="forecast" href="/forecast">

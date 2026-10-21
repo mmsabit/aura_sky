@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect } from 'react'
 import ForeCast from './components/forecast/ForeCast'
+import Loading from './components/Loading'
 import SiteFooter from './components/SiteFooter'
 import SiteHeader from './components/SiteHeader'
 import { useRoute } from './hooks/useRoute'
@@ -21,12 +22,7 @@ function App() {
       <Suspense
         fallback={
           <main className="w-full flex-1 bg-background pt-20">
-            <div className="mx-auto flex w-full max-w-340 items-center gap-space-xs px-margin py-space-2xl md:px-margin-tablet lg:px-margin-desktop">
-              <span className="h-4 w-4 animate-spin rounded-full border-2 border-secondary/30 border-t-secondary" />
-              <span className="font-body-md text-body-md text-on-surface-variant">
-                Loading page…
-              </span>
-            </div>
+            <Loading fullPage label="Loading page…" />
           </main>
         }
       >

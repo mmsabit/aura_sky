@@ -1,3 +1,4 @@
+import Loading from "../Loading";
 import { useWeatherData } from "../../hooks/useWeatherData";
 import {
   conditionLabel,
@@ -40,12 +41,13 @@ function formatUpdatedAt(iso?: string) {
 }
 
 function CurrentConditions() {
-  const { coords, placeLabel, placeError, forecast, forecastError, locationError } =
+  const { coords, placeLabel, placeError, forecast, forecastError, forecastLoading, locationError } =
     useWeatherData();
 
   const current = forecast?.current ?? null;
   const values = current?.values ?? {};
   const observedAt = current?.time;
+  const isLoading = forecastLoading && !current;
 
   const precipitationIntensity =
     (values.rainIntensity ?? 0) + (values.sleetIntensity ?? 0) + (values.snowIntensity ?? 0);
@@ -132,7 +134,10 @@ function CurrentConditions() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
+      {isLoading ? (
+        <Loading label="Fetching live conditions…" />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-space-lg">
         <div className="lg:col-span-5 relative overflow-hidden rounded-xl bg-surface-container-lowest p-space-xl shadow-sm flex flex-col justify-between">
           <div className="pointer-events-none absolute -right-12 -top-12 h-64 w-64 rounded-full bg-linear-to-br from-secondary-container/20 to-transparent blur-2xl"></div>
           <div className="flex items-start justify-between relative z-10">
@@ -211,6 +216,7 @@ function CurrentConditions() {
           ))}
         </div>
       </div>
+      )}
     </section>
   )
 }

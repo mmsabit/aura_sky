@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Loading from '../components/Loading'
 import LocationSearch from '../components/search/LocationSearch'
 import { useSearchQuery } from '../hooks/useRoute'
 import { useLocationSearch } from '../hooks/useLocationSearch'
@@ -259,12 +260,7 @@ function SearchResults() {
 
           {query && isLoading ? (
             <section className="rounded-xl bg-surface-container-lowest p-space-xl shadow-sm">
-              <div className="flex items-center gap-space-xs text-on-surface-variant">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-secondary/30 border-t-secondary"></span>
-                <span className="font-body-md text-body-md">
-                  Searching for “{query}”…
-                </span>
-              </div>
+              <Loading compact label={`Searching for “${query}”…`} />
             </section>
           ) : null}
 
@@ -378,9 +374,13 @@ function SearchResults() {
                           </p>
                         </div>
                       </div>
-                    ) : null}
-
-                    {!realtimeError ? (
+                    ) : realtimeLoading && !realtime ? (
+                      <Loading
+                        className="relative z-10"
+                        compact
+                        label="Fetching live conditions…"
+                      />
+                    ) : (
                       <>
                         <div className="relative z-10 flex flex-wrap items-center gap-space-lg">
                           <div className="flex items-center gap-space-md">
@@ -400,9 +400,7 @@ function SearchResults() {
                           </div>
                           <div className="flex flex-col gap-1">
                             <span className="font-headline-md text-headline-md text-on-surface">
-                              {realtimeLoading
-                                ? 'Loading conditions…'
-                                : conditionLabel(values.weatherCode)}
+                              {conditionLabel(values.weatherCode)}
                             </span>
                             <span className="font-body-md text-body-md text-on-surface-variant">
                               Feels like{' '}
@@ -441,7 +439,7 @@ function SearchResults() {
                           ))}
                         </div>
                       </>
-                    ) : null}
+                    )}
 
                     <span className="relative z-10 font-label-md text-label-md text-outline">
                       Live reading from Tomorrow.io • Location search by Open-Meteo

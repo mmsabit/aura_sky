@@ -8,6 +8,7 @@ import {
   YAxis,
   matchByDataKey,
 } from "recharts"
+import Loading from "../Loading"
 import { useWeatherData } from "../../hooks/useWeatherData"
 import type { DailyEntry } from "../../lib/weatherApi"
 
@@ -63,7 +64,7 @@ function findLongestDryStreak(entries: DailyEntry[]) {
 }
 
 function PrecipitationRecords() {
-  const { city, forecast, forecastError, locationError } = useWeatherData()
+  const { city, forecast, forecastError, forecastLoading, locationError } = useWeatherData()
   const [view, setView] = useState<View>('rain')
 
   const entries = forecast?.daily ?? []
@@ -136,7 +137,7 @@ function PrecipitationRecords() {
     ? 'Location unavailable — cannot load precipitation data.'
     : forecastError
       ? 'Precipitation forecast unavailable right now.'
-      : 'Loading precipitation outlook…'
+      : 'No precipitation data available.'
 
   return (
     <section className="flex flex-col gap-space-md rounded-xl bg-surface-container-lowest p-space-lg lg:p-space-xl shadow-sm">
@@ -174,7 +175,9 @@ function PrecipitationRecords() {
       <div className="flex items-center gap-space-sm p-3 rounded-lg bg-surface-container-low text-secondary font-body-sm text-body-sm">
         <span className="material-symbols-outlined text-[18px]">info</span>
         {!hasData ? (
-          <span>{statusMessage}</span>
+          <span>
+            {forecastLoading ? 'Fetching the latest precipitation outlook…' : statusMessage}
+          </span>
         ) : wettest && wettest.rain >= MEASURABLE_RAIN_MM ? (
           <span>
             Wettest day in this outlook: <strong>{wettestLabel}</strong> with{' '}
@@ -272,6 +275,10 @@ function PrecipitationRecords() {
                 </>
               ) : null}
             </BarChart>
+          ) : forecastLoading ? (
+            <div className="flex h-64 items-center justify-center">
+              <Loading compact label="Loading precipitation outlook…" />
+            </div>
           ) : (
             <div className="flex h-64 items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
               {statusMessage}

@@ -1,3 +1,4 @@
+import Loading from "../Loading"
 import { useWeatherData } from "../../hooks/useWeatherData"
 import { conditionLabel, weatherIcon } from "../../lib/weather"
 
@@ -23,7 +24,8 @@ function formatDay(iso: string) {
 }
 
 function SevenDayForecast() {
-  const { city, forecast: forecastData, forecastError, locationError } = useWeatherData()
+  const { city, forecast: forecastData, forecastError, forecastLoading, locationError } =
+    useWeatherData()
 
   const entries = forecastData?.daily ?? []
   const maxProbability = entries.reduce(
@@ -62,7 +64,7 @@ function SevenDayForecast() {
     ? 'Location unavailable — cannot load the forecast.'
     : forecastError
       ? 'Forecast unavailable right now.'
-      : 'Loading 7-day forecast…'
+      : 'No forecast data available.'
 
   return (
     <section className="flex flex-col gap-space-lg">
@@ -114,6 +116,10 @@ function SevenDayForecast() {
               </span>
             </div>
           ))}
+        </div>
+      ) : forecastLoading ? (
+        <div className="flex items-center justify-center rounded-xl bg-surface-container-lowest shadow-sm">
+          <Loading compact label="Loading 7-day forecast…" />
         </div>
       ) : (
         <div className="flex h-40 items-center justify-center rounded-xl bg-surface-container-lowest font-body-sm text-body-sm text-on-surface-variant shadow-sm">

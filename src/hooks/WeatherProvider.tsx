@@ -31,9 +31,11 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
   const locationKey = coordsKey ?? (locationError ? city || 'New York' : null)
 
   const [forecast, setForecast] = useState<ForecastData | null>(null)
-  const [forecastError, setForecastError] = useState(false)
+  const [forecastKey, setForecastKey] = useState<string | null>(null)
+  const [forecastFailed, setForecastFailed] = useState(false)
   const [history, setHistory] = useState<HourlyEntry[] | null>(null)
-  const [historyError, setHistoryError] = useState(false)
+  const [historyKey, setHistoryKey] = useState<string | null>(null)
+  const [historyFailed, setHistoryFailed] = useState(false)
 
   useEffect(() => {
     if (!locationKey) return
@@ -44,13 +46,15 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
       .then((data) => {
         if (!active) return
         setForecast(data)
-        setForecastError(false)
+        setForecastFailed(false)
+        setForecastKey(locationKey)
       })
       .catch((reason) => {
         if (!active) return
         console.error(reason)
         setForecast(null)
-        setForecastError(true)
+        setForecastFailed(true)
+        setForecastKey(locationKey)
       })
 
     return () => {
@@ -67,13 +71,15 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
       .then((entries) => {
         if (!active) return
         setHistory(entries)
-        setHistoryError(false)
+        setHistoryFailed(false)
+        setHistoryKey(locationKey)
       })
       .catch((reason) => {
         if (!active) return
         console.error(reason)
         setHistory(null)
-        setHistoryError(true)
+        setHistoryFailed(true)
+        setHistoryKey(locationKey)
       })
 
     return () => {
@@ -81,13 +87,27 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
     }
   }, [locationKey])
 
+  // Data is tagged with the location it belongs to, so switching location
+  // immediately hides the previous reading and shows the loader until the
+  // new request resolves.
+  const forecastReady = forecastKey === locationKey
+  const historyReady = historyKey === locationKey
+  const activeForecast = forecastReady ? forecast : null
+  const activeHistory = historyReady ? history : null
+  const forecastLoading = locationKey === null || !forecastReady
+  const historyLoading = locationKey === null || !historyReady
+  const forecastError = forecastReady && forecastFailed
+  const historyError = historyReady && historyFailed
+
   const value = useMemo<WeatherContextValue>(
     () => ({
       coords,
       city,
       placeLabel,
-      forecast,
-      history,
+      forecast: activeForecast,
+      history: activeHistory,
+      forecastLoading,
+      historyLoading,
       forecastError,
       historyError,
       locationError,
@@ -97,8 +117,10 @@ export function WeatherProvider({ children }: { children: ReactNode }) {
       coords,
       city,
       placeLabel,
-      forecast,
-      history,
+      activeForecast,
+      activeHistory,
+      forecastLoading,
+      historyLoading,
       forecastError,
       historyError,
       locationError,

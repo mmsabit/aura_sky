@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import Loading from '../Loading'
 
 type WeatherMapProps = {
   latitude: number
@@ -35,11 +36,13 @@ function buildWindyUrl(latitude: number, longitude: number) {
 
 function WeatherMap({ latitude, longitude, placeLabel }: WeatherMapProps) {
   const [reloadToken, setReloadToken] = useState(0)
+  const [loadedSrc, setLoadedSrc] = useState('')
 
   const src = useMemo(
     () => buildWindyUrl(latitude, longitude),
     [latitude, longitude],
   )
+  const iframeKey = `${src}-${reloadToken}`
 
   return (
     <section
@@ -83,12 +86,18 @@ function WeatherMap({ latitude, longitude, placeLabel }: WeatherMapProps) {
       </div>
 
       <div className="relative z-0 h-162.5 w-full overflow-hidden rounded-lg bg-surface-container-low">
+        {loadedSrc !== iframeKey ? (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-container-low">
+            <Loading compact label="Loading weather map…" />
+          </div>
+        ) : null}
         <iframe
           allowFullScreen
           className="h-full w-full border-0"
           height="650"
-          key={`${src}-${reloadToken}`}
+          key={iframeKey}
           loading="lazy"
+          onLoad={() => setLoadedSrc(iframeKey)}
           src={src}
           title={`Windy weather map for ${placeLabel}`}
           width="100%"
