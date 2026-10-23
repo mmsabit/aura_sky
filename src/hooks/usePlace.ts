@@ -26,11 +26,10 @@ export function reverseGeocode(latitude: number, longitude: number) {
     const params = new URLSearchParams({
       latitude: roundedLatitude,
       longitude: roundedLongitude,
-      key: import.meta.env.VITE_GEO_API_KEY,
     })
 
     return fetch(
-      `https://api-bdc.net/data/reverse-geocode?${params.toString()}`,
+      `/api/geo/reverse-geocode?${params.toString()}`,
     ).then((res) => {
       if (!res.ok) throw new Error(`Reverse geocode failed: ${res.status}`)
       return res.json() as Promise<Place>

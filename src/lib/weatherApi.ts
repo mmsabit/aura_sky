@@ -86,11 +86,9 @@ const forecastCache = createCachedRequest<ForecastData>('forecast')
 const historyCache = createCachedRequest<HourlyEntry[]>('history')
 const realtimeCache = createCachedRequest<RealtimeData>('realtime', 2 * 60 * 1000)
 
-function readApiKey() {
-  const apiKey = import.meta.env.VITE_WEATHER_API
-  if (!apiKey) throw new Error('Missing VITE_WEATHER_API environment variable')
-  return apiKey
-}
+// Same-origin routes served by the API proxy in `server/apiProxy.ts`, which
+// attaches WEATHER_API server-side so the key never reaches the browser.
+const WEATHER_API_BASE = '/api/weather'
 
 function closestToNow(entries: HourlyEntry[]) {
   if (entries.length === 0) return null
@@ -111,12 +109,11 @@ async function loadForecast(location: string): Promise<ForecastData> {
   const params = new URLSearchParams({
     location,
     timesteps: '1h,1d',
-    apikey: readApiKey(),
     units: 'metric',
   })
 
   const res = await fetch(
-    `https://api.tomorrow.io/v4/weather/forecast?${params.toString()}`,
+    `${WEATHER_API_BASE}/forecast?${params.toString()}`,
   )
   if (!res.ok) throw new Error(`Forecast request failed: ${res.status}`)
 
@@ -139,12 +136,11 @@ async function loadHistory(location: string): Promise<HourlyEntry[]> {
   const params = new URLSearchParams({
     location,
     timesteps: '1h',
-    apikey: readApiKey(),
     units: 'metric',
   })
 
   const res = await fetch(
-    `https://api.tomorrow.io/v4/weather/history/recent?${params.toString()}`,
+    `${WEATHER_API_BASE}/history?${params.toString()}`,
   )
   if (!res.ok) throw new Error(`Temperature history request failed: ${res.status}`)
 
@@ -166,12 +162,11 @@ export function fetchHistory(location: string) {
 async function loadRealtime(location: string): Promise<RealtimeData> {
   const params = new URLSearchParams({
     location,
-    apikey: readApiKey(),
     units: 'metric',
   })
 
   const res = await fetch(
-    `https://api.tomorrow.io/v4/weather/realtime?${params.toString()}`,
+    `${WEATHER_API_BASE}/realtime?${params.toString()}`,
   )
   if (!res.ok) throw new Error(`Realtime weather request failed: ${res.status}`)
 
