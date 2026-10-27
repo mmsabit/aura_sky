@@ -20,7 +20,6 @@ function buildWindyUrl(latitude: number, longitude: number) {
     product: 'ecmwf',
     menu: '',
     message: '',
-    marker: 'true',
     calendar: 'now',
     pressure: '',
     type: 'map',

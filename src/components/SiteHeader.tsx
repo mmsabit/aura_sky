@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import logo from '../assets/logo.png'
 import LocationSearch from './search/LocationSearch'
 import type { Route } from '../hooks/useRoute'
@@ -15,7 +15,10 @@ type SiteHeaderProps = {
 function SiteHeader({ activePath }: SiteHeaderProps) {
   const [menuState, setMenuState] = useState({ path: activePath, open: false })
   const menuOpen = menuState.path === activePath && menuState.open
-  const setMenuOpen = (open: boolean) => setMenuState({ path: activePath, open })
+  const setMenuOpen = useCallback(
+    (open: boolean) => setMenuState({ path: activePath, open }),
+    [activePath],
+  )
 
   useEffect(() => {
     if (!menuOpen) return
@@ -26,7 +29,7 @@ function SiteHeader({ activePath }: SiteHeaderProps) {
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [menuOpen])
+  }, [menuOpen, setMenuOpen])
 
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-surface-container-lowest/80 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.04)]">
