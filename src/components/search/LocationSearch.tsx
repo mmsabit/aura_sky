@@ -68,7 +68,6 @@ function LocationSearch({ variant = 'header', autoFocus = false }: LocationSearc
           onClick={() => setValue('')}
           type="button"
         >
-          <span className="material-symbols-outlined text-[18px]">close</span>
         </button>
       ) : null}
       <button

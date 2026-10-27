@@ -140,14 +140,14 @@ function TemperatureTrend() {
             {city ? ` for ${city}` : ''}
           </p>
         </div>
-        <div className="inline-flex p-1 rounded-xl bg-surface-container-low self-start sm:self-auto">
+        <div className="inline-flex shrink-0 p-1 rounded-xl bg-surface-container-low self-start sm:self-auto">
           {METRICS.map((option) => (
             <button
               key={option.key}
               className={
                 option.key === metric
-                  ? 'px-3 py-1.5 rounded-lg bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md font-semibold'
-                  : 'px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors'
+                  ? 'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md font-semibold'
+                  : 'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors'
               }
               onClick={() => setMetric(option.key)}
               type="button"
@@ -158,50 +158,50 @@ function TemperatureTrend() {
         </div>
       </div>
 
-      <div className="relative w-full overflow-x-auto pt-space-md">
-        <div className="min-w-175 relative">
-          {focusEntry !== null ? (
-            <div
-              className="absolute -top-3 -translate-x-1/2 z-20 pointer-events-none transition-transform"
-              style={{ left: `${calloutLeft}%` }}
-            >
-              <div className="flex flex-col gap-1 px-3.5 py-2.5 rounded-xl bg-surface-container-lowest shadow-xl text-on-surface font-body-sm text-body-sm">
-                <div className="flex items-center gap-1.5 text-secondary font-label-sm text-label-sm font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
-                  {formatDay(focusEntry.time, {
-                    weekday: 'long',
-                    month: 'short',
-                    day: 'numeric',
-                  })}{' '}
-                  · {formatTime(focusEntry.time)}
-                </div>
-                <div className="flex items-center gap-3 font-label-md text-label-md">
-                  <span>
-                    Temp:{' '}
-                    <strong className="text-on-surface">
-                      {roundTemperature(focusEntry.values.temperature)}°C
-                    </strong>
-                  </span>
-                  <span>
-                    Feels:{' '}
-                    <strong className="text-primary font-semibold">
-                      {roundTemperature(focusEntry.values.temperatureApparent)}°C
-                    </strong>
-                  </span>
-                </div>
+      <div className="relative w-full pt-space-md">
+        {focusEntry !== null ? (
+          <div
+            className="pointer-events-none z-20 mb-space-sm w-fit max-w-full md:absolute md:-top-3 md:mb-0 md:max-w-none md:-translate-x-1/2"
+            style={{ left: `clamp(8.5rem, ${calloutLeft}%, calc(100% - 8.5rem))` }}
+          >
+            <div className="flex flex-col gap-1 px-3.5 py-2.5 rounded-xl bg-surface-container-lowest shadow-xl text-on-surface font-body-sm text-body-sm">
+              <div className="flex flex-wrap items-center gap-1.5 text-secondary font-label-sm text-label-sm font-semibold">
+                <span className="w-2 h-2 rounded-full bg-secondary-container"></span>
+                {formatDay(focusEntry.time, {
+                  weekday: 'long',
+                  month: 'short',
+                  day: 'numeric',
+                })}{' '}
+                · {formatTime(focusEntry.time)}
               </div>
-              <div className="w-2.5 h-2.5 bg-surface-container-lowest rotate-45 mx-auto -mt-1 shadow-sm"></div>
+              <div className="flex items-center gap-3 font-label-md text-label-md">
+                <span>
+                  Temp:{' '}
+                  <strong className="text-on-surface">
+                    {roundTemperature(focusEntry.values.temperature)}°C
+                  </strong>
+                </span>
+                <span>
+                  Feels:{' '}
+                  <strong className="text-primary font-semibold">
+                    {roundTemperature(focusEntry.values.temperatureApparent)}°C
+                  </strong>
+                </span>
+              </div>
             </div>
-          ) : null}
+            <div className="hidden md:block w-2.5 h-2.5 bg-surface-container-lowest rotate-45 mx-auto -mt-1 shadow-sm"></div>
+          </div>
+        ) : null}
 
+        <div className="h-64 sm:h-72 lg:h-80">
           {points.length > 0 ? (
             <TempGraph data={points} metric={metric} />
           ) : historyLoading ? (
-            <div className="flex h-64 items-center justify-center">
+            <div className="flex h-full items-center justify-center">
               <Loading compact label="Loading temperature history…" />
             </div>
           ) : (
-            <div className="flex h-64 items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
+            <div className="flex h-full items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
               {statusMessage}
             </div>
           )}

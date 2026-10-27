@@ -85,7 +85,7 @@ function WeatherMap({ latitude, longitude, placeLabel }: WeatherMapProps) {
         </div>
       </div>
 
-      <div className="relative z-0 h-162.5 w-full overflow-hidden rounded-lg bg-surface-container-low">
+      <div className="relative z-0 h-96 w-full overflow-hidden rounded-lg bg-surface-container-low sm:h-128 lg:h-162.5">
         {loadedSrc !== iframeKey ? (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-surface-container-low">
             <Loading compact label="Loading weather map…" />

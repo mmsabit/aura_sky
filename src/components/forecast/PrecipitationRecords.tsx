@@ -20,10 +20,10 @@ type ChartPoint = {
   snow: number
 }
 
-const VIEWS: { key: View; label: string }[] = [
-  { key: 'rain', label: 'Rainfall (mm)' },
-  { key: 'snow', label: 'Snowfall (mm)' },
-  { key: 'combined', label: 'Combined View' },
+const VIEWS: { key: View; label: string; shortLabel: string }[] = [
+  { key: 'rain', label: 'Rainfall (mm)', shortLabel: 'Rain' },
+  { key: 'snow', label: 'Snowfall (mm)', shortLabel: 'Snow' },
+  { key: 'combined', label: 'Combined View', shortLabel: 'Combined' },
 ]
 
 const MEASURABLE_RAIN_MM = 0.2
@@ -154,19 +154,20 @@ function PrecipitationRecords() {
             {city ? ` for ${city}` : ''}
           </p>
         </div>
-        <div className="inline-flex p-1 rounded-xl bg-surface-container-low self-start sm:self-auto">
+        <div className="inline-flex shrink-0 p-1 rounded-xl bg-surface-container-low self-start sm:self-auto">
           {VIEWS.map((option) => (
             <button
               key={option.key}
               className={
                 option.key === view
-                  ? 'px-3 py-1.5 rounded-lg bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md font-semibold'
-                  : 'px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors'
+                  ? 'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg bg-surface-container-lowest shadow-sm text-primary font-label-md text-label-md font-semibold'
+                  : 'shrink-0 whitespace-nowrap px-3 py-1.5 rounded-lg text-on-surface-variant hover:text-on-surface font-label-md text-label-md transition-colors'
               }
               onClick={() => setView(option.key)}
               type="button"
             >
-              {option.label}
+              <span className="md:hidden">{option.shortLabel}</span>
+              <span className="hidden md:inline">{option.label}</span>
             </button>
           ))}
         </div>
@@ -190,19 +191,17 @@ function PrecipitationRecords() {
         )}
       </div>
 
-      <div className="relative w-full overflow-x-auto pt-space-xs">
-        <div className="min-w-170">
+      <div className="relative w-full pt-space-xs">
+        <div className="h-64 sm:h-72 lg:h-80">
           {hasData ? (
             <BarChart
               style={{
                 width: '100%',
                 height: '100%',
-                maxHeight: '70vh',
-                aspectRatio: 2.4,
               }}
               responsive
               data={points}
-              margin={{ top: 8, right: 12, left: 0, bottom: 5 }}
+              margin={{ top: 8, right: 28, left: 0, bottom: 5 }}
               barCategoryGap="28%"
             >
               <CartesianGrid stroke="#e2e7ff" strokeDasharray="4 4" vertical={false} />
@@ -276,11 +275,11 @@ function PrecipitationRecords() {
               ) : null}
             </BarChart>
           ) : forecastLoading ? (
-            <div className="flex h-64 items-center justify-center">
+            <div className="flex h-full items-center justify-center">
               <Loading compact label="Loading precipitation outlook…" />
             </div>
           ) : (
-            <div className="flex h-64 items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
+            <div className="flex h-full items-center justify-center font-body-sm text-body-sm text-on-surface-variant">
               {statusMessage}
             </div>
           )}

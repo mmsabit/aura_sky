@@ -86,9 +86,9 @@ function SevenDayForecast() {
           {forecast.map((day, index) => (
             <div
               key={`${day.day}-${index}`}
-              className={`p-4 rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center justify-between gap-space-sm ${
-                day.highlight ? 'relative overflow-hidden' : ''
-              } ${index === forecast.length - 1 ? 'col-span-2 sm:col-span-1' : ''}`}
+              className={`relative p-4 rounded-xl bg-surface-container-lowest shadow-sm hover:shadow-md transition-all flex flex-col items-center text-center justify-between gap-space-sm ${
+                day.highlight ? 'overflow-hidden' : ''
+              }`}
             >
               {day.precipChance !== undefined && day.precipChance > 0 ? (
                 <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-secondary-fixed text-primary absolute top-2 right-2">

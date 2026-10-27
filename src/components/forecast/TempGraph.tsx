@@ -40,14 +40,12 @@ const TempGraph = ({ data, metric }: TempGraphProps) => {
       style={{
         width: "100%",
         height: "100%",
-        maxHeight: "70vh",
-        aspectRatio: 2.4,
       }}
       responsive
       data={data}
       margin={{
         top: 5,
-        right: 12,
+        right: 28,
         left: 0,
         bottom: 5,
       }}
