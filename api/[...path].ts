@@ -2,6 +2,10 @@ export const config = {
   runtime: 'edge',
 }
 
+declare const process: {
+  env: Record<string, string | undefined>
+}
+
 type RouteConfig = {
   upstream: string
   key: string
