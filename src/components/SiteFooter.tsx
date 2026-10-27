@@ -9,35 +9,28 @@ const columns: FooterColumn[] = [
     links: [
       { label: 'Live Radar', path: 'radar-and-map' },
       { label: 'Hourly Forecast', path: 'forecast' },
-      { label: 'Weather API', path: 'weather-api' },
-      { label: 'Historical Trends', path: 'historical-data' },
     ],
   },
   {
     title: 'Resources',
     links: [
-      { label: 'Documentation', path: 'documentation' },
-      { label: 'Severe Weather Alerts', path: 'alerts' },
-      { label: 'Marine Forecast', path: 'marine-forecast' },
+      { label: 'Weather API', path: 'https://docs.tomorrow.io/reference/welcome' },
+      { label: 'Geo Location API', path: 'https://www.bigdatacloud.com/' },
+      { label: 'Weather Map', path: 'https://www.windy.com/' },
     ],
   },
   {
-    title: 'Company',
+    title: 'Socials',
     links: [
-      { label: 'About Us', path: 'about-us' },
-      { label: 'Sustainability', path: 'sustainability' },
-      { label: 'Contact', path: 'contact' },
-      { label: 'Privacy Policy', path: 'privacy-policy' },
-      { label: 'Terms', path: 'terms' },
+      { label: 'LinkedIn', path: 'https://www.linkedin.com/company/tomorrow-io' },
+      { label: 'X - Twitter', path: 'https://x.com/tomorrowio_' },
+      { label: 'Facebook', path: 'https://www.facebook.com/Tomorrow.io/' },
+      { label: 'Instagram', path: 'https://www.instagram.com/tomorrow_io/' },
     ],
   },
 ]
 
-const metaLinks = [
-  { label: 'Global Stations', ariaLabel: 'Global Network' },
-  { label: 'Telemetry Feeds', ariaLabel: 'Telemetry Feeds' },
-  { label: 'Satellite Mesh', ariaLabel: 'Satellite Constellation' },
-]
+
 
 const PAGE_LINKS: Record<string, string> = {
   forecast: '/forecast',
@@ -69,7 +62,10 @@ function SiteFooter() {
               <span className="font-headline-sm text-headline-sm text-on-surface">{column.title}</span>
               <nav className="flex flex-col gap-space-xs">
                 {column.links.map((link) => {
-                  const href = PAGE_LINKS[link.path]
+                  const href =
+                    PAGE_LINKS[link.path] ??
+                    (link.path.startsWith('https://') ? link.path : undefined)
+                  const isExternal = href?.startsWith('https://') ?? false
 
                   return (
                     <a
@@ -82,6 +78,8 @@ function SiteFooter() {
                       }
                       data-path={link.path}
                       href={href ?? '#'}
+                      rel={isExternal ? 'noreferrer' : undefined}
+                      target={isExternal ? '_blank' : undefined}
                       onClick={
                         href ? undefined : (event) => event.preventDefault()
                       }
@@ -100,17 +98,9 @@ function SiteFooter() {
             © 2025 Aura Sky Meteorological Systems Inc. All rights reserved.
           </p>
           <div className="flex items-center gap-space-md">
-            {metaLinks.map((link) => (
-              <a
-                key={link.label}
-                aria-label={link.ariaLabel}
-                className="font-label-md text-label-md hover:text-primary transition-colors"
-                href="#"
-                onClick={(event) => event.preventDefault()}
-              >
-                {link.label}
-              </a>
-            ))}
+            <p className="font-label-md text-label-md">
+            This is a practice project by <a href="https://github.com/mmsabit" className="text-primary">M M Sabit</a>
+          </p>
           </div>
         </div>
       </div>
