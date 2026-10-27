@@ -89,7 +89,7 @@ This project integrates three dedicated API services to retrieve weather and loc
 4. **[Windy Embed Map Service](https://www.windy.com/)**
    - **Purpose**: Provides interactive wind, radar, rain, and temperature overlay maps embedded via iframe.
 
-> **Note on Security:** Private keys (`WEATHER_API` and `GEO_API_KEY`) are kept server-side in the `.env` file and forwarded via Vite's internal API proxy (`server/apiProxy.ts`). They are never exposed directly to client-side browser bundles.
+> **Note on Security:** Private keys (`WEATHER_API` and `GEO_API_KEY`) are kept server-side in the `.env` file locally and forwarded via serverless handlers (`server/apiHandler.ts` and `api/*`). When deploying to **Vercel**, add `WEATHER_API` and `GEO_API_KEY` under **Project Settings &rarr; Environment Variables**. They are never exposed directly to client-side browser bundles.
 
 ---
 
